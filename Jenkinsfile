@@ -49,9 +49,9 @@ pipeline {
 
         APPZ_ARTIFACTS = 'D:/Deploy'
 
-        QUIZZ_PROJECT = 'C:/Users/ananda.dc/Downloads/quizapp (1)/quizapp'
+        QUIZZ_PROJECT = 'C:/Users/ananda.dc/Downloads/quizapp(1)/quizapp'
 
-        QUIZZ_BIN = 'C:/Users/ananda.dc/Downloads/quizapp (1)/quizapp/bin'
+        QUIZZ_BIN = 'C:/Users/ananda.dc/Downloads/quizapp(1)/quizapp/bin'
 
         // ============================================================
         // DATABASE
