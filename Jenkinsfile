@@ -24,10 +24,10 @@ pipeline {
         BACKEND_URL = 'http://localhost:8090/api/categories'
 
         // TOMCAT / APPZILLON - APPZILLON PROJECT BIN IS THE ONLY SOURCE
-        APPZ_HOME = 'D:\apache-tomcat-9.0.53\apache-tomcat-9.0.53'
-        APPZ_ARTIFACTS = 'D:\\forDeploy' // fallback if QUIZZ_BIN missing
-        QUIZZ_PROJECT = 'C:\Users\ananda.dc\Downloads\quizapp (1)\quizapp' // Appzillon project root (contains .apzprj)
-        QUIZZ_BIN = 'C:\Users\ananda.dc\Downloads\quizapp (1)\quizapp\bin' // -> Web/*.war, Server/*.war, Properties/*, Database/MySql/*.sql
+        APPZ_HOME = 'D:/apache-tomcat-9.0.53/apache-tomcat-9.0.53'
+        APPZ_ARTIFACTS = 'D://forDeploy' // fallback if QUIZZ_BIN missing
+        QUIZZ_PROJECT = 'C:/Users/ananda.dc/Downloads/quizapp (1)/quizapp' // Appzillon project root (contains .apzprj)
+        QUIZZ_BIN = 'C:/Users/ananda.dc/Downloads/quizapp (1)/quizapp/bin' // -> Web/*.war, Server/*.war, Properties/*, Database/MySql/*.sql
         TOMCAT_PORT = '8090'
         APPZILLON_URL = 'http://localhost:8090/quizapp/'
 
@@ -35,10 +35,10 @@ pipeline {
         DB_NAME = 'quiz_app'
         DB_USER = 'root'
         DB_PASS = 'root'
-        MYSQL_BIN = 'C:\Program Files\MySQL\MySQL Server 8.0\bin'
+        MYSQL_BIN = 'C:/Program Files/MySQL/MySQL Server 8.0/bin'
 
         // PLAYWRIGHT - runs AFTER UI popup (UI must be on APPZILLON_URL)
-        PLAYWRIGHT_DIR = 'C:\Users\ananda.dc\Downloads\quiz-app-backend (1)\quiz-app\src\test\java\playwrightTest.java'
+        PLAYWRIGHT_DIR = 'C:/Users/ananda.dc/Downloads/quiz-app-backend (1)/quiz-app/src/test/java/playwrightTest.java'
         // NOTE: All stages below read from above vars via %VAR% (bat) or $env:VAR (powershell) - no hardcoding inside stages
     }
 
@@ -60,7 +60,7 @@ pipeline {
                 bat '''
                     @echo off
                     set "JAVA_HOME=%JAVA_HOME%"
-                    set "PATH=%JAVA_HOME%\\bin;%PATH%"
+                    set "PATH=%JAVA_HOME%//bin;%PATH%"
                     echo JAVA VERSION
                     java -version
                     echo.
@@ -129,8 +129,8 @@ pipeline {
 
                 bat '''
                     @echo off
-                    if not exist "target\\quizapp.jar" (
-                        echo ERROR: target\\quizapp.jar NOT FOUND
+                    if not exist "target//quizapp.jar" (
+                        echo ERROR: target//quizapp.jar NOT FOUND
                         echo.
                         echo Target directory contents:
                         if exist target (
@@ -144,7 +144,7 @@ pipeline {
                     echo ==========================================
                     echo QUIZBACKEND JAR FOUND
                     echo ==========================================
-                    dir target\\*.jar
+                    dir target//*.jar
                 '''
             }
         }
@@ -164,10 +164,10 @@ pipeline {
 
                 bat '''
                     @echo off
-                    if not exist "%WORKSPACE%\\target\\quizapp.jar" (
+                    if not exist "%WORKSPACE%//target//quizapp.jar" (
                         echo ERROR: JAR NOT FOUND
                         echo Expected:
-                        echo %WORKSPACE%\\target\\quizapp.jar
+                        echo %WORKSPACE%//target//quizapp.jar
                         exit /b 1
                     )
 
@@ -194,7 +194,7 @@ pipeline {
                     echo ==========================================
 
                     set "JAVA_HOME=%JAVA_HOME%"
-                    set "PATH=%JAVA_HOME%\\bin;%PATH%"
+                    set "PATH=%JAVA_HOME%//bin;%PATH%"
                     set "JENKINS_NODE_COOKIE=dontKillMe"
 
                     echo Starting:
