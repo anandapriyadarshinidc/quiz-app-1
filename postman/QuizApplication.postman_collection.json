@@ -1,0 +1,181 @@
+{
+  "info": {
+    "name": "Quiz Application Backend",
+    "description": "Complete API collection for the Quiz Application Backend (Spring Boot + MySQL). Follow folder order for a full end-to-end test run.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:8080/api" },
+    { "key": "categoryId", "value": "1" },
+    { "key": "questionId", "value": "1" },
+    { "key": "userId", "value": "1" },
+    { "key": "attemptId", "value": "1" }
+  ],
+  "item": [
+    {
+      "name": "1. Users",
+      "item": [
+        {
+          "name": "Create User",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/users",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Demo User\",\n  \"email\": \"demo@example.com\",\n  \"password\": \"pass1234\",\n  \"role\": \"USER\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Get All Users",
+          "request": { "method": "GET", "url": "{{baseUrl}}/users" }
+        },
+        {
+          "name": "Get User By Id",
+          "request": { "method": "GET", "url": "{{baseUrl}}/users/{{userId}}" }
+        }
+      ]
+    },
+    {
+      "name": "2. Admin - Categories",
+      "item": [
+        {
+          "name": "Create Category",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/admin/categories",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Animals\",\n  \"description\": \"Quiz questions related to animals\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Get All Categories (Admin)",
+          "request": { "method": "GET", "url": "{{baseUrl}}/admin/categories" }
+        },
+        {
+          "name": "Get Category By Id (Admin)",
+          "request": { "method": "GET", "url": "{{baseUrl}}/admin/categories/{{categoryId}}" }
+        },
+        {
+          "name": "Update Category",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/admin/categories/{{categoryId}}",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Animals and Wildlife\",\n  \"description\": \"Animals and wildlife quiz\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Delete Category",
+          "request": { "method": "DELETE", "url": "{{baseUrl}}/admin/categories/{{categoryId}}" }
+        }
+      ]
+    },
+    {
+      "name": "3. Admin - Questions",
+      "item": [
+        {
+          "name": "Create Question",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/admin/questions",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"questionText\": \"Which is the largest land animal?\",\n  \"optionA\": \"Lion\",\n  \"optionB\": \"Elephant\",\n  \"optionC\": \"Tiger\",\n  \"optionD\": \"Giraffe\",\n  \"correctAnswer\": \"B\",\n  \"categoryId\": 1\n}"
+            }
+          }
+        },
+        {
+          "name": "Create Another Question",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/admin/questions",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"questionText\": \"Which animal is known as the king of the jungle?\",\n  \"optionA\": \"Tiger\",\n  \"optionB\": \"Lion\",\n  \"optionC\": \"Elephant\",\n  \"optionD\": \"Leopard\",\n  \"correctAnswer\": \"B\",\n  \"categoryId\": 1\n}"
+            }
+          }
+        },
+        {
+          "name": "Get All Questions",
+          "request": { "method": "GET", "url": "{{baseUrl}}/admin/questions" }
+        },
+        {
+          "name": "Get Question By Id",
+          "request": { "method": "GET", "url": "{{baseUrl}}/admin/questions/{{questionId}}" }
+        },
+        {
+          "name": "Get Questions By Category (Admin)",
+          "request": { "method": "GET", "url": "{{baseUrl}}/admin/questions/category/{{categoryId}}" }
+        },
+        {
+          "name": "Update Question",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/admin/questions/{{questionId}}",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"questionText\": \"Which is the largest land animal on Earth?\",\n  \"optionA\": \"Lion\",\n  \"optionB\": \"Elephant\",\n  \"optionC\": \"Tiger\",\n  \"optionD\": \"Giraffe\",\n  \"correctAnswer\": \"B\",\n  \"categoryId\": 1\n}"
+            }
+          }
+        },
+        {
+          "name": "Delete Question",
+          "request": { "method": "DELETE", "url": "{{baseUrl}}/admin/questions/{{questionId}}" }
+        }
+      ]
+    },
+    {
+      "name": "4. User - Categories & Questions",
+      "item": [
+        {
+          "name": "Get All Categories",
+          "request": { "method": "GET", "url": "{{baseUrl}}/categories" }
+        },
+        {
+          "name": "Get Category By Id",
+          "request": { "method": "GET", "url": "{{baseUrl}}/categories/{{categoryId}}" }
+        },
+        {
+          "name": "Get Questions For Category (no correctAnswer)",
+          "request": { "method": "GET", "url": "{{baseUrl}}/categories/{{categoryId}}/questions" }
+        }
+      ]
+    },
+    {
+      "name": "5. Quiz Submission & Results",
+      "item": [
+        {
+          "name": "Submit Quiz",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/quizzes/{{categoryId}}/submit",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": 1,\n  \"answers\": [\n    { \"questionId\": 1, \"selectedAnswer\": \"B\" },\n    { \"questionId\": 2, \"selectedAnswer\": \"A\" },\n    { \"questionId\": 3, \"selectedAnswer\": \"C\" }\n  ]\n}"
+            }
+          }
+        },
+        {
+          "name": "Get Single Quiz Result",
+          "request": { "method": "GET", "url": "{{baseUrl}}/quiz-attempts/{{attemptId}}" }
+        },
+        {
+          "name": "Get User Quiz History",
+          "request": { "method": "GET", "url": "{{baseUrl}}/users/{{userId}}/quiz-attempts" }
+        }
+      ]
+    }
+  ]
+}
