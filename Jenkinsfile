@@ -21,7 +21,7 @@ pipeline {
         // BACKEND
         APP_JAR = 'target/quizapp.jar'
         BACKEND_PORT = '8080'
-        BACKEND_URL = 'http://localhost:8090/api/categories'
+        BACKEND_URL = 'http://localhost:8080/api/categories'
 
         // TOMCAT / APPZILLON - APPZILLON PROJECT BIN IS THE ONLY SOURCE
         APPZ_HOME = 'D:/apache-tomcat-9.0.53/apache-tomcat-9.0.53'
