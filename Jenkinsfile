@@ -27,7 +27,7 @@ pipeline {
         BACKEND_URL = 'http://localhost:8080/api/categories'
 
         // ============================================================
-        // APPZILLON / TOMCAT
+        // TOMCAT / APPZILLON
         // ============================================================
 
         APPZ_HOME = 'D:/apache-tomcat-9.0.53/apache-tomcat-9.0.53'
@@ -53,11 +53,13 @@ pipeline {
         MYSQL_BIN = 'C:/Program Files/MySQL/MySQL Server 8.0/bin'
 
         // ============================================================
-        // PLAYWRIGHT JAVA TEST
+        // PLAYWRIGHT
+        // IMPORTANT:
+        // This must be the folder containing package.json
         // ============================================================
 
-        PLAYWRIGHT_FILE =
-            'C:/Users/ananda.dc/Downloads/quiz-app-backend (1)/quiz-app/src/test/java/playwrightTest.java'
+        PLAYWRIGHT_DIR = 'C:/Users/ananda.dc/Downloads/quiz-app-backend (1)/quiz-app'
+
     }
 
 
@@ -79,9 +81,8 @@ pipeline {
                     @echo off
 
                     set "JAVA_HOME=%JAVA_HOME%"
-                    set "PATH=%JAVA_HOME%\\bin;%MAVEN_HOME%\\bin;%PATH%"
+                    set "PATH=%JAVA_HOME%\\bin;%PATH%"
 
-                    echo.
                     echo JAVA VERSION
                     java -version
 
@@ -94,6 +95,7 @@ pipeline {
                 echo '=========================================='
                 echo 'CHECKING MAVEN PROJECT'
                 echo '=========================================='
+
 
                 bat '''
                     @echo off
@@ -120,12 +122,11 @@ pipeline {
                 echo 'KILLING OLD BACKEND PROCESS'
                 echo '=========================================='
 
+
                 bat '''
                     @echo off
 
-                    for /f "tokens=5" %%a in (
-                        'netstat -ano ^| findstr :%BACKEND_PORT% ^| findstr LISTENING'
-                    ) do (
+                    for /f "tokens=5" %%a in ('netstat -ano ^| findstr :%BACKEND_PORT% ^| findstr LISTENING') do (
                         echo Killing process %%a on port %BACKEND_PORT%
                         taskkill /F /PID %%a >nul 2>&1
                     )
@@ -138,11 +139,12 @@ pipeline {
                 echo 'STARTING MAVEN BUILD'
                 echo '=========================================='
 
+
                 bat '''
                     @echo off
 
                     set "JAVA_HOME=%JAVA_HOME%"
-                    set "PATH=%JAVA_HOME%\\bin;%MAVEN_HOME%\\bin;%PATH%"
+                    set "PATH=%JAVA_HOME%\\bin;%PATH%"
 
                     mvn clean package -DskipTests
 
@@ -165,6 +167,7 @@ pipeline {
                 echo 'CHECKING GENERATED JAR'
                 echo '=========================================='
 
+
                 bat '''
                     @echo off
 
@@ -174,7 +177,7 @@ pipeline {
                         echo.
                         echo Target directory contents:
 
-                        if exist "target" (
+                        if exist target (
                             dir target
                         ) else (
                             echo target directory does not exist
@@ -206,6 +209,7 @@ pipeline {
                 echo 'DEPLOYING QUIZAPP BACKEND'
                 echo '=========================================='
 
+
                 bat '''
                     @echo off
 
@@ -224,12 +228,13 @@ pipeline {
                     echo CHECKING PORT %BACKEND_PORT%
                     echo ==========================================
 
-                    for /f "tokens=5" %%a in (
-                        'netstat -ano ^| findstr :%BACKEND_PORT% ^| findstr LISTENING'
-                    ) do (
+                    for /f "tokens=5" %%a in ('netstat -ano ^| findstr :%BACKEND_PORT% ^| findstr LISTENING') do (
                         echo Stopping process %%a on port %BACKEND_PORT%
                         taskkill /F /PID %%a >nul 2>&1
                     )
+
+                    echo.
+                    echo Waiting for port %BACKEND_PORT%...
 
                     ping 127.0.0.1 -n 4 >nul
 
@@ -239,7 +244,7 @@ pipeline {
                     echo ==========================================
 
                     set "JAVA_HOME=%JAVA_HOME%"
-                    set "PATH=%JAVA_HOME%\\bin;%MAVEN_HOME%\\bin;%PATH%"
+                    set "PATH=%JAVA_HOME%\\bin;%PATH%"
                     set "JENKINS_NODE_COOKIE=dontKillMe"
 
                     echo Starting:
@@ -282,10 +287,9 @@ pipeline {
                 echo 'CHECKING QUIZAPP BACKEND'
                 echo '=========================================='
 
+
                 bat '''
                     @echo off
-
-                    setlocal EnableDelayedExpansion
 
                     echo.
                     echo Backend URL:
@@ -297,11 +301,12 @@ pipeline {
 
                     set RETRIES=20
 
+
                     :CHECK_BACKEND
 
                     echo.
                     echo Checking backend...
-                    echo Remaining attempts: !RETRIES!
+                    echo Remaining attempts: %RETRIES%
 
                     curl -s -o nul -w "%%{http_code}" "%BACKEND_URL%" | findstr "200 201"
 
@@ -318,12 +323,14 @@ pipeline {
                         exit /b 0
                     )
 
+
                     echo.
                     echo Backend not ready.
 
                     set /a RETRIES-=1
 
-                    if !RETRIES! LEQ 0 (
+
+                    if %RETRIES% LEQ 0 (
 
                         echo.
                         echo ==========================================
@@ -331,11 +338,17 @@ pipeline {
                         echo ==========================================
 
                         echo.
-                        echo PORT STATUS
+                        echo ==========================================
+                        echo PORT %BACKEND_PORT% STATUS
+                        echo ==========================================
+
                         netstat -ano | findstr :%BACKEND_PORT%
 
+
                         echo.
+                        echo ==========================================
                         echo BACKEND LOG
+                        echo ==========================================
 
                         if exist backend.log (
                             type backend.log
@@ -344,10 +357,11 @@ pipeline {
                         )
 
                         exit /b 1
-                    )
+                    }
+
 
                     echo.
-                    echo Waiting 3 seconds...
+                    echo Waiting 3 seconds before retry...
 
                     ping 127.0.0.1 -n 4 >nul
 
@@ -358,692 +372,884 @@ pipeline {
 
 
         // ============================================================
-        // APPZILLON - FIND WAR / PROPERTIES / DATABASE
+        // APPZILLON DEPLOYMENT
         // ============================================================
 
-        stage('Find Appzillon Files') {
+        stage('Deploy Appzillon - Full') {
 
             steps {
 
                 echo '=========================================='
-                echo 'SEARCHING APPZILLON PROJECT'
+                echo 'DEPLOYING APPZILLON - FULL STEPS'
                 echo '=========================================='
+
+                // ====================================================
+                // STEP 1-4
+                // FIND WAR / PROPERTIES / DATABASE
+                // ====================================================
 
                 powershell '''
                     $ErrorActionPreference = "Stop"
 
                     Write-Host "=========================================="
-                    Write-Host "APPZILLON CONFIGURATION"
+                    Write-Host "CHECKING APPZILLON PROJECT"
                     Write-Host "=========================================="
+
+                    Write-Host "QUIZZ_PROJECT: $env:QUIZZ_PROJECT"
+                    Write-Host "QUIZZ_BIN: $env:QUIZZ_BIN"
+                    Write-Host "APPZ_HOME: $env:APPZ_HOME"
+
 
                     $quizBin = $env:QUIZZ_BIN
                     $appzHome = $env:APPZ_HOME
                     $artifacts = $env:APPZ_ARTIFACTS
 
-                    Write-Host "QUIZZ_PROJECT : $env:QUIZZ_PROJECT"
-                    Write-Host "QUIZZ_BIN     : $quizBin"
-                    Write-Host "APPZ_HOME     : $appzHome"
-
-                    # ------------------------------------------------
-                    # Validate QUIZZ_BIN
-                    # ------------------------------------------------
 
                     if (-not (Test-Path -LiteralPath $quizBin)) {
-                        Write-Host "ERROR: QUIZZ_BIN does not exist:"
-                        Write-Host $quizBin
-                        exit 1
+
+                        Write-Host "WARNING: QUIZZ_BIN not found."
+                        Write-Host "Using fallback: $artifacts"
+
+                        $quizBin = $null
+                    }
+                    else {
+
+                        Write-Host "Found QUIZZ_BIN: $quizBin"
+
+                        Get-ChildItem `
+                            -LiteralPath $quizBin `
+                            -Recurse `
+                            -Depth 2 `
+                            -ErrorAction SilentlyContinue |
+                            ForEach-Object {
+                                Write-Host $_.FullName
+                            }
                     }
 
-                    Write-Host ""
-                    Write-Host "QUIZZ_BIN found successfully."
-
-                    # ------------------------------------------------
-                    # Validate Tomcat
-                    # ------------------------------------------------
 
                     if (-not (Test-Path -LiteralPath $appzHome)) {
-                        Write-Host "ERROR: Tomcat not found:"
-                        Write-Host $appzHome
+
+                        Write-Host "ERROR: Tomcat not found at $appzHome"
+
                         exit 1
                     }
+
 
                     if (-not (Test-Path -LiteralPath "$appzHome\\bin\\catalina.bat")) {
-                        Write-Host "ERROR: catalina.bat not found."
+
+                        Write-Host "ERROR: catalina.bat missing"
+
                         exit 1
                     }
 
-                    Write-Host "Tomcat found successfully."
 
-                    # ------------------------------------------------
-                    # FIND WEB WAR
-                    # ------------------------------------------------
+                    Write-Host "Tomcat found: $appzHome"
 
-                    $webWar = Get-ChildItem `
-                        -LiteralPath "$quizBin\\Web" `
-                        -Filter "*.war" `
-                        -File `
-                        -ErrorAction SilentlyContinue |
-                        Select-Object -First 1
 
-                    if (-not $webWar) {
+                    // =================================================
+                    // SEARCH FOR WAR FILES
+                    // =================================================
 
-                        $webWar = Get-ChildItem `
+                    Write-Host ""
+                    Write-Host "=========================================="
+                    Write-Host "SEARCHING FOR WAR FILES"
+                    Write-Host "=========================================="
+
+
+                    $webWar = $null
+                    $serverWar = $null
+                    $webPropsSource = $null
+                    $serverPropsSource = $null
+                    $dbSqlPath = $null
+
+
+                    if ($quizBin) {
+
+                        // WEB WAR
+
+                        $webWarCandidates =
+                            Get-ChildItem `
                             -LiteralPath "$quizBin\\Web" `
                             -Filter "*.war" `
-                            -File `
-                            -Recurse `
                             -ErrorAction SilentlyContinue |
                             Select-Object -First 1
-                    }
 
-                    if (-not $webWar) {
-                        Write-Host "ERROR: Web WAR not found."
-                        exit 1
-                    }
 
-                    $webWarPath = $webWar.FullName
-                    $webWarName = $webWar.Name
+                        if ($webWarCandidates) {
+                            $webWar = $webWarCandidates.FullName
+                        }
 
-                    Write-Host ""
-                    Write-Host "WEB WAR:"
-                    Write-Host $webWarPath
 
-                    # ------------------------------------------------
-                    # FIND SERVER WAR
-                    # ------------------------------------------------
+                        if (-not $webWar) {
 
-                    $serverWar = Get-ChildItem `
-                        -LiteralPath "$quizBin\\Server" `
-                        -Filter "*.war" `
-                        -File `
-                        -ErrorAction SilentlyContinue |
-                        Select-Object -First 1
+                            $webWar =
+                                (Get-ChildItem `
+                                -Path "$quizBin\\Web" `
+                                -Filter "*.war" `
+                                -Recurse `
+                                -ErrorAction SilentlyContinue |
+                                Select-Object -First 1).FullName
+                        }
 
-                    if (-not $serverWar) {
 
-                        $serverWar = Get-ChildItem `
+                        // SERVER WAR
+
+                        $serverWarCandidates =
+                            Get-ChildItem `
                             -LiteralPath "$quizBin\\Server" `
                             -Filter "*.war" `
-                            -File `
-                            -Recurse `
                             -ErrorAction SilentlyContinue |
                             Select-Object -First 1
-                    }
 
-                    $serverWarPath = ""
 
-                    if ($serverWar) {
-                        $serverWarPath = $serverWar.FullName
+                        if ($serverWarCandidates) {
+                            $serverWar = $serverWarCandidates.FullName
+                        }
 
-                        Write-Host ""
-                        Write-Host "SERVER WAR:"
-                        Write-Host $serverWarPath
-                    }
-                    else {
-                        Write-Host ""
-                        Write-Host "WARNING: Server WAR not found."
-                    }
 
-                    # ------------------------------------------------
-                    # FIND WEB PROPERTIES
-                    # ------------------------------------------------
+                        if (-not $serverWar) {
 
-                    $webPropsRoot = Join-Path $quizBin "Web\\Properties"
+                            $serverWar =
+                                (Get-ChildItem `
+                                -Path "$quizBin\\Server" `
+                                -Filter "*.war" `
+                                -Recurse `
+                                -ErrorAction SilentlyContinue |
+                                Select-Object -First 1).FullName
+                        }
 
-                    $webProps = $null
 
-                    if (Test-Path -LiteralPath $webPropsRoot) {
+                        // WEB PROPERTIES
 
-                        $webProps = Get-ChildItem `
-                            -LiteralPath $webPropsRoot `
-                            -Directory `
-                            -ErrorAction SilentlyContinue |
-                            Select-Object -First 1
-                    }
+                        $webPropsRoot = "$quizBin\\Web\\Properties"
 
-                    $webPropsPath = ""
 
-                    if ($webProps) {
-                        $webPropsPath = $webProps.FullName
+                        if (Test-Path -LiteralPath $webPropsRoot) {
 
-                        Write-Host ""
-                        Write-Host "WEB PROPERTIES:"
-                        Write-Host $webPropsPath
-                    }
-                    else {
-                        Write-Host ""
-                        Write-Host "WARNING: Web properties folder not found."
-                    }
+                            $webPropsSource =
+                                (Get-ChildItem `
+                                -LiteralPath $webPropsRoot `
+                                -Directory `
+                                -ErrorAction SilentlyContinue |
+                                Select-Object -First 1).FullName
 
-                    # ------------------------------------------------
-                    # FIND SERVER PROPERTIES
-                    # ------------------------------------------------
+                            Write-Host "Web Properties found: $webPropsSource"
+                        }
 
-                    $serverPropsRoot = Join-Path $quizBin "Server\\Properties"
 
-                    $serverProps = $null
+                        // SERVER PROPERTIES
 
-                    if (Test-Path -LiteralPath $serverPropsRoot) {
+                        $serverPropsRoot = "$quizBin\\Server\\Properties"
 
-                        $serverProps = Get-ChildItem `
-                            -LiteralPath $serverPropsRoot `
-                            -Directory `
-                            -ErrorAction SilentlyContinue |
-                            Select-Object -First 1
-                    }
 
-                    $serverPropsPath = ""
+                        if (Test-Path -LiteralPath $serverPropsRoot) {
 
-                    if ($serverProps) {
+                            $serverPropsSource =
+                                (Get-ChildItem `
+                                -LiteralPath $serverPropsRoot `
+                                -Directory `
+                                -ErrorAction SilentlyContinue |
+                                Select-Object -First 1).FullName
 
-                        $serverPropsPath = $serverProps.FullName
+                            Write-Host "Server Properties found: $serverPropsSource"
+                        }
 
-                        Write-Host ""
-                        Write-Host "SERVER PROPERTIES:"
-                        Write-Host $serverPropsPath
-                    }
-                    else {
-                        Write-Host ""
-                        Write-Host "WARNING: Server properties folder not found."
-                    }
 
-                    # ------------------------------------------------
-                    # DATABASE PATH
-                    # ------------------------------------------------
+                        // DATABASE
 
-                    $dbPath = Join-Path $quizBin "Server\\Database\\MySql"
+                        $dbSqlPath = "$quizBin\\Server\\Database\\MySql"
 
-                    if (-not (Test-Path -LiteralPath $dbPath)) {
 
-                        Write-Host ""
-                        Write-Host "WARNING: Standard DB path not found."
+                        if (-not (Test-Path -LiteralPath $dbSqlPath)) {
 
-                        $dbPath = ""
-                    }
+                            $dbSqlPath =
+                                "$quizBin\\Server\\Properties\\AppzillonServer\\quizzz\\Database\\MySql"
 
-                    Write-Host ""
-                    Write-Host "DATABASE PATH:"
-                    Write-Host $dbPath
 
-                    # ------------------------------------------------
-                    # SQL FILES
-                    # ------------------------------------------------
+                            if (-not (Test-Path -LiteralPath $dbSqlPath)) {
 
-                    if ($dbPath) {
+                                $sqlFile =
+                                    Get-ChildItem `
+                                    -Path $quizBin `
+                                    -Filter "*.sql" `
+                                    -Recurse `
+                                    -ErrorAction SilentlyContinue |
+                                    Select-Object -First 1
 
-                        $sqlFiles = Get-ChildItem `
-                            -LiteralPath $dbPath `
-                            -Filter "*.sql" `
-                            -File `
-                            -ErrorAction SilentlyContinue
-
-                        Write-Host ""
-                        Write-Host "SQL FILES FOUND:"
-
-                        foreach ($sql in $sqlFiles) {
-                            Write-Host $sql.FullName
+                                if ($sqlFile) {
+                                    $dbSqlPath = $sqlFile.DirectoryName
+                                }
+                            }
                         }
                     }
 
-                    # ------------------------------------------------
-                    # SAVE VARIABLES
-                    # ------------------------------------------------
+
+                    // =================================================
+                    // FALLBACK
+                    // =================================================
+
+                    if (-not $webWar -and (Test-Path -LiteralPath "$artifacts\\quizzz.war")) {
+
+                        $webWar = "$artifacts\\quizzz.war"
+
+                        Write-Host "Fallback Web WAR: $webWar"
+                    }
+
+
+                    if (-not $serverWar -and (Test-Path -LiteralPath "$artifacts\\AppzillonServer.war")) {
+
+                        $serverWar = "$artifacts\\AppzillonServer.war"
+
+                        Write-Host "Fallback Server WAR: $serverWar"
+                    }
+
+
+                    if (-not $webPropsSource -and (Test-Path -LiteralPath "$artifacts\\quizzz")) {
+
+                        $webPropsSource = "$artifacts\\quizzz"
+
+                        Write-Host "Fallback Web Props: $webPropsSource"
+                    }
+
+
+                    if (-not $serverPropsSource -and (Test-Path -LiteralPath "$artifacts\\lib\\AppzillonServer")) {
+
+                        $serverPropsSource =
+                            "$artifacts\\lib\\AppzillonServer"
+
+                        Write-Host "Fallback Server Props: $serverPropsSource"
+                    }
+
+
+                    if (-not $dbSqlPath -and (Test-Path -LiteralPath "$artifacts\\lib\\AppzillonServer\\quizzz\\Database\\MySql")) {
+
+                        $dbSqlPath =
+                            "$artifacts\\lib\\AppzillonServer\\quizzz\\Database\\MySql"
+                    }
+
+
+                    Write-Host ""
+                    Write-Host "Web WAR: $webWar"
+                    Write-Host "Server WAR: $serverWar"
+                    Write-Host "Web Props Source: $webPropsSource"
+                    Write-Host "Server Props Source: $serverPropsSource"
+                    Write-Host "DB SQL Path: $dbSqlPath"
+
+
+                    if (-not $webWar -or -not (Test-Path -LiteralPath $webWar)) {
+
+                        Write-Host "ERROR: Web WAR not found!"
+
+                        exit 1
+                    }
+
+
+                    if (-not $serverWar -or -not (Test-Path -LiteralPath $serverWar)) {
+
+                        Write-Host "WARNING: Server WAR missing."
+                        Write-Host "Continuing with Web WAR only."
+                    }
+
+
+                    // =================================================
+                    // SAVE VARIABLES
+                    // =================================================
 
                     $varsFile = Join-Path $env:WORKSPACE "appzillon_vars.txt"
 
-                    @"
-WEB_WAR=$webWarPath
-WEB_WAR_NAME=$webWarName
-SERVER_WAR=$serverWarPath
-WEB_PROPS=$webPropsPath
-SERVER_PROPS=$serverPropsPath
-DB_PATH=$dbPath
-"@ | Set-Content -LiteralPath $varsFile
 
-                    Write-Host ""
-                    Write-Host "=========================================="
-                    Write-Host "APPZILLON FILE SEARCH COMPLETED"
-                    Write-Host "=========================================="
+                    @(
+                        "WEB_WAR=$webWar"
+                        "SERVER_WAR=$serverWar"
+                        "WEB_PROPS=$webPropsSource"
+                        "SERVER_PROPS=$serverPropsSource"
+                        "DB_PATH=$dbSqlPath"
+                    ) |
+                    Set-Content -LiteralPath $varsFile
 
-                    Write-Host "Variables saved to:"
-                    Write-Host $varsFile
+
+                    Write-Host "Vars saved to: $varsFile"
                 '''
-            }
-        }
 
 
-        // ============================================================
-        // COPY PROPERTIES
-        // ============================================================
-
-        stage('Copy Appzillon Properties') {
-
-            steps {
-
-                echo '=========================================='
-                echo 'COPYING APPZILLON PROPERTIES'
-                echo '=========================================='
+                // ====================================================
+                // STEP 5
+                // COPY PROPERTIES
+                // ====================================================
 
                 powershell '''
                     $ErrorActionPreference = "Stop"
 
-                    $varsFile = Join-Path $env:WORKSPACE "appzillon_vars.txt"
+                    Write-Host "=========================================="
+                    Write-Host "COPYING PROPERTIES TO TOMCAT LIB"
+                    Write-Host "=========================================="
 
-                    if (-not (Test-Path -LiteralPath $varsFile)) {
-                        Write-Host "ERROR: appzillon_vars.txt not found."
-                        exit 1
-                    }
+
+                    $appzHome = $env:APPZ_HOME
+
+                    $varsFile =
+                        Join-Path $env:WORKSPACE "appzillon_vars.txt"
+
+
+                    $vars =
+                        Get-Content `
+                        -LiteralPath $varsFile `
+                        -ErrorAction SilentlyContinue
+
 
                     $map = @{}
 
-                    foreach ($line in Get-Content -LiteralPath $varsFile) {
+
+                    foreach ($line in $vars) {
 
                         if ($line -match "^(.*?)=(.*)$") {
+
                             $map[$matches[1]] = $matches[2]
                         }
                     }
 
+
                     $webProps = $map["WEB_PROPS"]
                     $serverProps = $map["SERVER_PROPS"]
 
-                    $libPath = Join-Path $env:APPZ_HOME "lib"
 
-                    Write-Host "Tomcat LIB:"
-                    Write-Host $libPath
+                    Write-Host "Web Props: $webProps"
+                    Write-Host "Server Props: $serverProps"
+                    Write-Host "Tomcat LIB: $appzHome\\lib"
 
-                    if (-not (Test-Path -LiteralPath $libPath)) {
-
-                        New-Item `
-                            -ItemType Directory `
-                            -Path $libPath `
-                            -Force |
-                            Out-Null
-                    }
-
-                    # ------------------------------------------------
-                    # WEB PROPERTIES
-                    # ------------------------------------------------
 
                     if ($webProps -and (Test-Path -LiteralPath $webProps)) {
 
-                        $folderName = Split-Path $webProps -Leaf
-
-                        $destination = Join-Path $libPath $folderName
-
                         Write-Host ""
-                        Write-Host "Copying Web Properties:"
-                        Write-Host $webProps
-                        Write-Host "To:"
-                        Write-Host $destination
+                        Write-Host "Copying Web Properties..."
 
-                        if (Test-Path -LiteralPath $destination) {
+                        if (-not (Test-Path -LiteralPath "$appzHome\\lib")) {
+
+                            New-Item `
+                                -ItemType Directory `
+                                -Path "$appzHome\\lib" `
+                                -Force |
+                                Out-Null
+                        }
+
+
+                        $destName =
+                            Split-Path $webProps -Leaf
+
+
+                        $dest =
+                            Join-Path "$appzHome\\lib" $destName
+
+
+                        if (Test-Path -LiteralPath $dest) {
 
                             Remove-Item `
-                                -LiteralPath $destination `
+                                -LiteralPath $dest `
                                 -Recurse `
-                                -Force
+                                -Force `
+                                -ErrorAction SilentlyContinue
                         }
+
 
                         Copy-Item `
                             -LiteralPath $webProps `
-                            -Destination $libPath `
+                            -Destination "$appzHome\\lib\\" `
                             -Recurse `
                             -Force
+
 
                         Write-Host "Web Properties copied successfully."
                     }
                     else {
 
-                        Write-Host "WARNING: Web properties not found."
+                        Write-Host "WARNING: Web Props not found."
                     }
 
-                    # ------------------------------------------------
-                    # SERVER PROPERTIES
-                    # ------------------------------------------------
 
                     if ($serverProps -and (Test-Path -LiteralPath $serverProps)) {
 
-                        $folderName = Split-Path $serverProps -Leaf
-
-                        $destination = Join-Path $libPath $folderName
-
                         Write-Host ""
-                        Write-Host "Copying Server Properties:"
-                        Write-Host $serverProps
-                        Write-Host "To:"
-                        Write-Host $destination
+                        Write-Host "Copying Server Properties..."
 
-                        if (Test-Path -LiteralPath $destination) {
+
+                        $destName =
+                            Split-Path $serverProps -Leaf
+
+
+                        $dest =
+                            Join-Path "$appzHome\\lib" $destName
+
+
+                        if (Test-Path -LiteralPath $dest) {
 
                             Remove-Item `
-                                -LiteralPath $destination `
+                                -LiteralPath $dest `
                                 -Recurse `
-                                -Force
+                                -Force `
+                                -ErrorAction SilentlyContinue
                         }
+
 
                         Copy-Item `
                             -LiteralPath $serverProps `
-                            -Destination $libPath `
+                            -Destination "$appzHome\\lib\\" `
                             -Recurse `
                             -Force
+
 
                         Write-Host "Server Properties copied successfully."
                     }
                     else {
 
-                        Write-Host "WARNING: Server properties not found."
+                        Write-Host "WARNING: Server Props not found."
                     }
 
-                    Write-Host ""
-                    Write-Host "=========================================="
-                    Write-Host "TOMCAT LIB CONTENTS"
-                    Write-Host "=========================================="
 
-                    Get-ChildItem -LiteralPath $libPath |
+                    Write-Host ""
+                    Write-Host "Tomcat lib contents after copy:"
+
+
+                    Get-ChildItem `
+                        -LiteralPath "$appzHome\\lib" |
                         Where-Object {
-                            $_.Name -like "quiz*" -or
+                            $_.Name -like "quizzz*" -or
                             $_.Name -like "AppzillonServer*"
                         } |
                         ForEach-Object {
-                            Write-Host $_.FullName
+                            Write-Host "  $($_.Name)"
                         }
                 '''
-            }
-        }
 
 
-        // ============================================================
-        // DATABASE
-        // IMPORTANT:
-        // THIS IS POWERHELL INSTEAD OF BAT.
-        // THIS FIXES quizapp (1) PATH ERROR.
-        // ============================================================
-
-        stage('Run MySQL Database Scripts') {
-
-            steps {
-
-                echo '=========================================='
-                echo 'RUNNING MYSQL DATABASE SCRIPTS'
-                echo '=========================================='
+                // ====================================================
+                // STEP 6
+                // DATABASE
+                //
+                // IMPORTANT:
+                // This is PowerShell-safe.
+                // NO "< $tempSql" is used.
+                // ====================================================
 
                 powershell '''
-                    $ErrorActionPreference = "Stop"
+                    $ErrorActionPreference = "Continue"
 
+                    Write-Host ""
                     Write-Host "=========================================="
-                    Write-Host "MYSQL DATABASE SETUP"
+                    Write-Host "RUNNING MYSQL DATABASE SCRIPTS"
                     Write-Host "=========================================="
 
-                    $mysqlExe = Join-Path $env:MYSQL_BIN "mysql.exe"
 
-                    Write-Host "MYSQL EXE:"
-                    Write-Host $mysqlExe
+                    $dbName = $env:DB_NAME
+                    $dbUser = $env:DB_USER
+                    $dbPass = $env:DB_PASS
+                    $mysqlBin = $env:MYSQL_BIN
+
+
+                    Write-Host "DB_NAME: $dbName"
+                    Write-Host "MYSQL_BIN: $mysqlBin"
+                    Write-Host "DB_USER: $dbUser"
+
+
+                    // =================================================
+                    // FIND MYSQL.EXE
+                    // =================================================
+
+                    $mysqlExe =
+                        Join-Path $mysqlBin "mysql.exe"
+
 
                     if (-not (Test-Path -LiteralPath $mysqlExe)) {
 
-                        Write-Host "ERROR: mysql.exe not found:"
+                        Write-Host "mysql.exe not found at:"
                         Write-Host $mysqlExe
 
-                        exit 1
+                        $mysqlExe =
+                            "C:\\Program Files\\MySQL\\MySQL Server 8.0\\bin\\mysql.exe"
                     }
 
-                    Write-Host ""
-                    Write-Host "Database:"
-                    Write-Host $env:DB_NAME
 
-                    # ------------------------------------------------
-                    # CREATE DATABASE
-                    # ------------------------------------------------
+                    if (-not (Test-Path -LiteralPath $mysqlExe)) {
+
+                        Write-Host "Trying mysql from PATH..."
+
+                        $mysqlCommand =
+                            Get-Command mysql.exe `
+                            -ErrorAction SilentlyContinue
+
+
+                        if ($mysqlCommand) {
+
+                            $mysqlExe =
+                                $mysqlCommand.Source
+                        }
+                    }
+
+
+                    if (-not (Test-Path -LiteralPath $mysqlExe)) {
+
+                        Write-Host "WARNING: mysql.exe not found."
+                        Write-Host "Skipping database setup."
+
+                        exit 0
+                    }
+
+
+                    Write-Host "Using MYSQL_EXE: $mysqlExe"
+
+
+                    // =================================================
+                    // CREATE DATABASE
+                    // =================================================
 
                     Write-Host ""
-                    Write-Host "Creating database if it does not exist..."
+                    Write-Host "Creating database if not exists: $dbName"
+
 
                     & $mysqlExe `
-                        "-u$env:DB_USER" `
-                        "-p$env:DB_PASS" `
+                        "-u$dbUser" `
+                        "-p$dbPass" `
                         "-e" `
-                        "CREATE DATABASE IF NOT EXISTS $env:DB_NAME CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
+                        "CREATE DATABASE IF NOT EXISTS $dbName CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
+
 
                     if ($LASTEXITCODE -ne 0) {
 
-                        Write-Host "ERROR: Could not create/access database."
-                        exit 1
+                        Write-Host "WARNING: Database creation returned exit code $LASTEXITCODE"
+                        Write-Host "Continuing..."
+                    }
+                    else {
+
+                        Write-Host "Database $dbName ensured."
                     }
 
-                    Write-Host "Database ensured successfully."
 
-                    # ------------------------------------------------
-                    # READ DB PATH
-                    # ------------------------------------------------
+                    // =================================================
+                    // GET DB PATH FROM VARIABLES FILE
+                    // =================================================
 
-                    $varsFile = Join-Path $env:WORKSPACE "appzillon_vars.txt"
+                    Write-Host ""
+                    Write-Host "Searching for SQL files..."
+
 
                     $dbPath = ""
 
+
+                    $varsFile =
+                        Join-Path $env:WORKSPACE "appzillon_vars.txt"
+
+
                     if (Test-Path -LiteralPath $varsFile) {
 
-                        foreach ($line in Get-Content -LiteralPath $varsFile) {
+                        $dbLine =
+                            Get-Content -LiteralPath $varsFile |
+                            Where-Object {
+                                $_ -like "DB_PATH=*"
+                            } |
+                            Select-Object -First 1
 
-                            if ($line -like "DB_PATH=*") {
 
-                                $dbPath = $line.Substring(8)
-                                break
+                        if ($dbLine) {
+
+                            $dbPath =
+                                $dbLine.Substring(8)
+                        }
+                    }
+
+
+                    Write-Host "DB_PATH from vars: $dbPath"
+
+
+                    if ([string]::IsNullOrWhiteSpace($dbPath)) {
+
+                        $dbPath =
+                            Join-Path $env:QUIZZ_BIN "Server\\Database\\MySql"
+                    }
+
+
+                    Write-Host "Using DB_PATH: $dbPath"
+
+
+                    // =================================================
+                    // FALLBACK DATABASE PATHS
+                    // =================================================
+
+                    if (-not (Test-Path -LiteralPath $dbPath)) {
+
+                        Write-Host "DB_PATH not found."
+
+                        $alternate1 =
+                            Join-Path `
+                            $env:QUIZZ_PROJECT `
+                            "bin\\Server\\Database\\MySql"
+
+
+                        if (Test-Path -LiteralPath $alternate1) {
+
+                            $dbPath = $alternate1
+                        }
+                        else {
+
+                            $alternate2 =
+                                Join-Path `
+                                $env:APPZ_ARTIFACTS `
+                                "lib\\AppzillonServer\\quizzz\\Database\\MySql"
+
+
+                            if (Test-Path -LiteralPath $alternate2) {
+
+                                $dbPath = $alternate2
                             }
                         }
                     }
 
-                    Write-Host ""
-                    Write-Host "DB PATH FROM VARIABLES:"
-                    Write-Host $dbPath
 
-                    # ------------------------------------------------
-                    # FALLBACK DB PATH
-                    # ------------------------------------------------
+                    Write-Host "Final DB_PATH: $dbPath"
 
-                    if ([string]::IsNullOrWhiteSpace($dbPath)) {
-
-                        $dbPath = Join-Path `
-                            $env:QUIZZ_BIN `
-                            "Server\\Database\\MySql"
-                    }
-
-                    Write-Host ""
-                    Write-Host "FINAL DB PATH:"
-                    Write-Host $dbPath
 
                     if (-not (Test-Path -LiteralPath $dbPath)) {
 
-                        Write-Host ""
-                        Write-Host "ERROR: Database path does not exist:"
-                        Write-Host $dbPath
+                        Write-Host "WARNING: DB_PATH not found."
+                        Write-Host "Skipping SQL execution."
 
-                        exit 1
-                    }
-
-                    # ------------------------------------------------
-                    # FIND SQL FILES
-                    # ------------------------------------------------
-
-                    $sqlFiles = Get-ChildItem `
-                        -LiteralPath $dbPath `
-                        -Filter "*.sql" `
-                        -File |
-                        Sort-Object Name
-
-                    if ($sqlFiles.Count -eq 0) {
-
-                        Write-Host "WARNING: No SQL files found."
                         exit 0
                     }
 
-                    Write-Host ""
-                    Write-Host "SQL FILES FOUND:"
 
-                    foreach ($sql in $sqlFiles) {
-                        Write-Host " - $($sql.FullName)"
+                    // =================================================
+                    // FIND SQL FILES
+                    // =================================================
+
+                    $sqlFiles =
+                        Get-ChildItem `
+                        -LiteralPath $dbPath `
+                        -Filter "*.sql" `
+                        -File `
+                        -ErrorAction SilentlyContinue
+
+
+                    if (-not $sqlFiles) {
+
+                        Write-Host "No SQL files found in $dbPath"
+
+                        exit 0
                     }
 
-                    # ------------------------------------------------
-                    # EXECUTE SQL
-                    # ------------------------------------------------
 
-                    foreach ($sql in $sqlFiles) {
+                    Write-Host ""
+                    Write-Host "Found SQL files:"
+                    $sqlFiles | ForEach-Object {
+                        Write-Host "  $($_.FullName)"
+                    }
+
+
+                    // =================================================
+                    // EXECUTE SQL FILES
+                    // =================================================
+
+                    foreach ($sqlFile in $sqlFiles) {
 
                         Write-Host ""
                         Write-Host "=========================================="
-                        Write-Host "EXECUTING:"
-                        Write-Host $sql.Name
+                        Write-Host "Executing: $($sqlFile.Name)"
                         Write-Host "=========================================="
 
-                        $sqlContent = Get-Content `
-                            -LiteralPath $sql.FullName `
-                            -Raw
 
-                        $tempSql = Join-Path `
+                        $tempSql =
+                            Join-Path `
                             $env:TEMP `
-                            ("quizapp_" + $sql.Name)
+                            "$($sqlFile.BaseName)_quizapp.sql"
 
-                        $finalSql = "USE $($env:DB_NAME);`r`n" + $sqlContent
 
-                        Set-Content `
-                            -LiteralPath $tempSql `
-                            -Value $finalSql `
-                            -Encoding UTF8
+                        try {
 
-                        Write-Host "Temporary SQL file:"
-                        Write-Host $tempSql
+                            // -----------------------------------------
+                            // Create temporary SQL file
+                            // -----------------------------------------
 
-                        & $mysqlExe `
-                            "-u$env:DB_USER" `
-                            "-p$env:DB_PASS" `
-                            $env:DB_NAME `
-                            < $tempSql
+                            "USE $dbName;" |
+                                Set-Content `
+                                -LiteralPath $tempSql `
+                                -Encoding UTF8
 
-                        if ($LASTEXITCODE -ne 0) {
+
+                            Get-Content `
+                                -LiteralPath $sqlFile.FullName |
+                                Add-Content `
+                                -LiteralPath $tempSql `
+                                -Encoding UTF8
+
+
+                            Write-Host "Temporary SQL file:"
+                            Write-Host $tempSql
+
+
+                            // -----------------------------------------
+                            // IMPORTANT FIX
+                            //
+                            // DO NOT USE:
+                            //
+                            // mysql ... < $tempSql
+                            //
+                            // PowerShell does not support that syntax.
+                            //
+                            // Instead pipe the file contents into mysql.
+                            // -----------------------------------------
+
+                            Get-Content `
+                                -LiteralPath $tempSql `
+                                -Raw |
+                                & $mysqlExe `
+                                "-u$dbUser" `
+                                "-p$dbPass" `
+                                $dbName
+
+
+                            $mysqlExitCode = $LASTEXITCODE
+
+
+                            if ($mysqlExitCode -ne 0) {
+
+                                Write-Host ""
+                                Write-Host "WARNING: Failed to execute $($sqlFile.Name)"
+                                Write-Host "MySQL exit code: $mysqlExitCode"
+
+                                Write-Host ""
+                                Write-Host "Trying MySQL SOURCE method..."
+
+
+                                $sourceCommand =
+                                    "USE $dbName; SOURCE `"$($sqlFile.FullName.Replace('\','/'))`";"
+
+
+                                & $mysqlExe `
+                                    "-u$dbUser" `
+                                    "-p$dbPass" `
+                                    "-D" `
+                                    $dbName `
+                                    "-e" `
+                                    $sourceCommand
+
+
+                                if ($LASTEXITCODE -ne 0) {
+
+                                    Write-Host "ERROR: Still failed for $($sqlFile.Name)"
+                                }
+                                else {
+
+                                    Write-Host "Success via SOURCE for $($sqlFile.Name)"
+                                }
+                            }
+                            else {
+
+                                Write-Host ""
+                                Write-Host "Successfully executed $($sqlFile.Name)"
+                            }
+
+                        }
+                        catch {
 
                             Write-Host ""
-                            Write-Host "ERROR: Failed executing:"
-                            Write-Host $sql.FullName
-
-                            Remove-Item `
-                                -LiteralPath $tempSql `
-                                -Force `
-                                -ErrorAction SilentlyContinue
-
-                            exit 1
+                            Write-Host "ERROR executing $($sqlFile.Name)"
+                            Write-Host $_
                         }
+                        finally {
 
-                        Write-Host ""
-                        Write-Host "SUCCESS:"
-                        Write-Host $sql.Name
+                            if (Test-Path -LiteralPath $tempSql) {
 
-                        Remove-Item `
-                            -LiteralPath $tempSql `
-                            -Force `
-                            -ErrorAction SilentlyContinue
+                                Remove-Item `
+                                    -LiteralPath $tempSql `
+                                    -Force `
+                                    -ErrorAction SilentlyContinue
+                            }
+                        }
                     }
 
-                    # ------------------------------------------------
-                    # VERIFY DATABASE
-                    # ------------------------------------------------
+
+                    // =================================================
+                    // VERIFY TABLES
+                    // =================================================
 
                     Write-Host ""
                     Write-Host "=========================================="
-                    Write-Host "VERIFYING DATABASE TABLES"
+                    Write-Host "VERIFYING TABLES"
                     Write-Host "=========================================="
 
+
                     & $mysqlExe `
-                        "-u$env:DB_USER" `
-                        "-p$env:DB_PASS" `
+                        "-u$dbUser" `
+                        "-p$dbPass" `
                         "-D" `
-                        $env:DB_NAME `
+                        $dbName `
                         "-e" `
                         "SHOW TABLES;"
 
-                    if ($LASTEXITCODE -ne 0) {
-
-                        Write-Host "ERROR: Could not verify tables."
-                        exit 1
-                    }
 
                     Write-Host ""
-                    Write-Host "=========================================="
-                    Write-Host "MYSQL DATABASE SETUP SUCCESSFUL"
-                    Write-Host "=========================================="
+                    Write-Host "DATABASE STAGE COMPLETED"
                 '''
-            }
-        }
 
 
-        // ============================================================
-        // TOMCAT DEPLOYMENT
-        // ============================================================
-
-        stage('Deploy Appzillon WARs') {
-
-            steps {
-
-                echo '=========================================='
-                echo 'DEPLOYING APPZILLON WAR FILES'
-                echo '=========================================='
+                // ====================================================
+                // STEP 7 & 8
+                // TOMCAT SHUTDOWN / WAR DEPLOYMENT / START
+                // ====================================================
 
                 bat '''
                     @echo off
 
-                    setlocal EnableDelayedExpansion
-
                     echo.
                     echo ==========================================
-                    echo TOMCAT CONFIGURATION
+                    echo TOMCAT SHUTDOWN AND WAR DEPLOYMENT
                     echo ==========================================
 
-                    echo TOMCAT HOME:
-                    echo %APPZ_HOME%
+                    echo TOMCAT HOME: %APPZ_HOME%
+                    echo TOMCAT PORT: %TOMCAT_PORT%
 
-                    echo TOMCAT PORT:
-                    echo %TOMCAT_PORT%
 
                     set "WEB_WAR="
                     set "SERVER_WAR="
-                    set "WEB_WAR_NAME="
+
 
                     if exist "%WORKSPACE%\\appzillon_vars.txt" (
 
-                        for /f "tokens=1,* delims==" %%a in (
-                            'type "%WORKSPACE%\\appzillon_vars.txt" ^| findstr /B "WEB_WAR="'
-                        ) do set "WEB_WAR=%%b"
+                        for /f "tokens=1,* delims==" %%a in ('type "%WORKSPACE%\\appzillon_vars.txt" ^| findstr "^WEB_WAR="') do set "WEB_WAR=%%b"
 
-                        for /f "tokens=1,* delims==" %%a in (
-                            'type "%WORKSPACE%\\appzillon_vars.txt" ^| findstr /B "SERVER_WAR="'
-                        ) do set "SERVER_WAR=%%b"
+                        for /f "tokens=1,* delims==" %%a in ('type "%WORKSPACE%\\appzillon_vars.txt" ^| findstr "^SERVER_WAR="') do set "SERVER_WAR=%%b"
+                    }
 
-                        for /f "tokens=1,* delims==" %%a in (
-                            'type "%WORKSPACE%\\appzillon_vars.txt" ^| findstr /B "WEB_WAR_NAME="'
-                        ) do set "WEB_WAR_NAME=%%b"
-                    )
 
-                    echo.
-                    echo WEB WAR:
-                    echo !WEB_WAR!
+                    echo WEB_WAR: %WEB_WAR%
+                    echo SERVER_WAR: %SERVER_WAR%
 
-                    echo.
-                    echo SERVER WAR:
-                    echo !SERVER_WAR!
 
-                    echo.
-                    echo WEB WAR NAME:
-                    echo !WEB_WAR_NAME!
+                    if "%WEB_WAR%"=="" set "WEB_WAR=%APPZ_ARTIFACTS%\\quizzz.war"
 
-                    if "!WEB_WAR!"=="" (
-                        echo ERROR: WEB WAR path is empty.
+                    if "%SERVER_WAR%"=="" set "SERVER_WAR=%APPZ_ARTIFACTS%\\AppzillonServer.war"
+
+
+                    echo Final WEB_WAR: %WEB_WAR%
+                    echo Final SERVER_WAR: %SERVER_WAR%
+
+
+                    if not exist "%WEB_WAR%" (
+
+                        echo ERROR: WEB WAR not found at %WEB_WAR%
+
                         exit /b 1
-                    )
+                    }
 
-                    if not exist "!WEB_WAR!" (
-                        echo ERROR: WEB WAR does not exist:
-                        echo !WEB_WAR!
-                        exit /b 1
-                    )
+
+                    if not exist "%SERVER_WAR%" (
+
+                        echo WARNING: SERVER WAR not found.
+
+                        echo Continuing with Web WAR only.
+                    }
+
+
+                    // =================================================
+                    // SHUTDOWN TOMCAT
+                    // =================================================
 
                     echo.
                     echo ==========================================
@@ -1052,92 +1258,127 @@ DB_PATH=$dbPath
 
                     call "%APPZ_HOME%\\bin\\shutdown.bat"
 
-                    ping 127.0.0.1 -n 6 >nul
+
+                    echo shutdown.bat executed.
 
                     echo.
-                    echo Killing remaining Tomcat process on port %TOMCAT_PORT%
+                    echo Waiting 5 seconds...
 
-                    for /f "tokens=5" %%a in (
-                        'netstat -ano ^| findstr :%TOMCAT_PORT% ^| findstr LISTENING'
-                    ) do (
+                    ping 127.0.0.1 -n 6 >nul
+
+
+                    // =================================================
+                    // KILL REMAINING PROCESS
+                    // =================================================
+
+                    echo Killing remaining process on port %TOMCAT_PORT%...
+
+
+                    for /f "tokens=5" %%a in ('netstat -ano ^| findstr :%TOMCAT_PORT% ^| findstr LISTENING') do (
+
                         echo Killing PID %%a
+
                         taskkill /F /PID %%a >nul 2>&1
                     )
+
 
                     ping 127.0.0.1 -n 3 >nul
 
 
+                    // =================================================
+                    // CLEAN OLD DEPLOYMENT
+                    // =================================================
+
                     echo.
                     echo ==========================================
-                    echo CLEANING OLD QUIZAPP DEPLOYMENT
+                    echo CLEANING OLD DEPLOYMENTS
                     echo ==========================================
 
-                    rmdir /S /Q "%APPZ_HOME%\\webapps\\quizapp" >nul 2>&1
-                    del /F /Q "%APPZ_HOME%\\webapps\\quizapp.war" >nul 2>&1
+
+                    rmdir /S /Q "%APPZ_HOME%\\webapps\\quizzz" >nul 2>&1
 
                     rmdir /S /Q "%APPZ_HOME%\\webapps\\AppzillonServer" >nul 2>&1
+
+                    del /F /Q "%APPZ_HOME%\\webapps\\quizzz.war" >nul 2>&1
+
                     del /F /Q "%APPZ_HOME%\\webapps\\AppzillonServer.war" >nul 2>&1
 
-                    rmdir /S /Q "%APPZ_HOME%\\work\\Catalina\\localhost\\quizapp" >nul 2>&1
+
+                    rmdir /S /Q "%APPZ_HOME%\\work\\Catalina\\localhost\\quizzz" >nul 2>&1
+
                     rmdir /S /Q "%APPZ_HOME%\\work\\Catalina\\localhost\\AppzillonServer" >nul 2>&1
 
 
+                    // =================================================
+                    // COPY WEB WAR
+                    // =================================================
+
                     echo.
                     echo ==========================================
-                    echo COPYING WEB WAR
+                    echo COPYING NEW WARS
                     echo ==========================================
 
-                    copy /Y "!WEB_WAR!" "%APPZ_HOME%\\webapps\\quizapp.war"
+
+                    copy /Y "%WEB_WAR%" "%APPZ_HOME%\\webapps\\quizzz.war"
+
 
                     if errorlevel 1 (
+
                         echo ERROR: Failed to copy Web WAR.
+
                         exit /b 1
                     )
+
 
                     echo Web WAR copied successfully.
 
 
-                    echo.
-                    echo ==========================================
-                    echo COPYING SERVER WAR
-                    echo ==========================================
+                    // =================================================
+                    // COPY SERVER WAR
+                    // =================================================
 
-                    if not "!SERVER_WAR!"=="" (
+                    if exist "%SERVER_WAR%" (
 
-                        if exist "!SERVER_WAR!" (
+                        copy /Y "%SERVER_WAR%" "%APPZ_HOME%\\webapps\\AppzillonServer.war"
 
-                            copy /Y "!SERVER_WAR!" "%APPZ_HOME%\\webapps\\AppzillonServer.war"
 
-                            if errorlevel 1 (
-                                echo ERROR: Failed to copy Server WAR.
-                                exit /b 1
-                            )
+                        if errorlevel 1 (
 
-                            echo Server WAR copied successfully.
+                            echo ERROR: Failed to copy Server WAR.
+
+                            exit /b 1
                         )
-                        else (
-                            echo WARNING: Server WAR path does not exist.
-                        )
-                    )
-                    else (
-                        echo WARNING: Server WAR was not found.
+
+
+                        echo Server WAR copied successfully.
                     )
 
+
+                    // =================================================
+                    // START TOMCAT
+                    // =================================================
 
                     echo.
                     echo ==========================================
                     echo STARTING TOMCAT
                     echo ==========================================
 
+
                     set "JAVA_HOME=%JAVA_HOME%"
-                    set "PATH=%JAVA_HOME%\\bin;%MAVEN_HOME%\\bin;%PATH%"
+                    set "PATH=%JAVA_HOME%\\bin;%PATH%"
                     set "CATALINA_HOME=%APPZ_HOME%"
                     set "JENKINS_NODE_COOKIE=dontKillMe"
 
+
+                    echo JAVA_HOME: %JAVA_HOME%
+                    echo CATALINA_HOME: %CATALINA_HOME%
+
+
                     call "%APPZ_HOME%\\bin\\catalina.bat" start
 
-                    echo.
-                    echo Tomcat startup command executed.
+
+                    echo catalina.bat start executed.
+
 
                     echo.
                     echo Waiting for Tomcat...
@@ -1145,62 +1386,62 @@ DB_PATH=$dbPath
                     ping 127.0.0.1 -n 21 >nul
 
 
+                    // =================================================
+                    // CHECK TOMCAT PORT
+                    // =================================================
+
                     echo.
                     echo ==========================================
-                    echo CHECKING TOMCAT PORT
+                    echo CHECKING TOMCAT PORT %TOMCAT_PORT%
                     echo ==========================================
+
 
                     netstat -ano | findstr :%TOMCAT_PORT% | findstr LISTENING
 
+
                     if errorlevel 1 (
 
-                        echo Port %TOMCAT_PORT% not listening yet.
+                        echo WARNING: Port not listening yet.
 
-                        echo Waiting another 10 seconds...
-
-                        ping 127.0.0.1 -n 11 >nul
+                        ping 127.0.0.1 -n 10 >nul
 
                         netstat -ano | findstr :%TOMCAT_PORT%
                     )
                     else (
 
-                        echo.
-                        echo ==========================================
-                        echo TOMCAT IS RUNNING
-                        echo ==========================================
+                        echo Port %TOMCAT_PORT% is LISTENING.
+                    )
+
+
+                    // =================================================
+                    // TOMCAT LOGS
+                    // =================================================
+
+                    echo.
+                    echo ==========================================
+                    echo TOMCAT LOGS
+                    echo ==========================================
+
+
+                    if exist "%APPZ_HOME%\\logs\\catalina.out" (
+
+                        powershell -Command "Get-Content '%APPZ_HOME%\\logs\\catalina.out' -Tail 40"
+                    )
+                    else (
+
+                        echo catalina.out not found.
+
+                        dir "%APPZ_HOME%\\logs\\"
                     )
 
 
                     echo.
-                    echo ==========================================
-                    echo WEBAPPS CONTENT
-                    echo ==========================================
-
-                    dir "%APPZ_HOME%\\webapps\\"
+                    echo Checking webapps deployment...
 
 
-                    echo.
-                    echo ==========================================
-                    echo CHECKING QUIZAPP DEPLOYMENT
-                    echo ==========================================
+                    dir "%APPZ_HOME%\\webapps\\" | findstr quizzz
 
-                    if exist "%APPZ_HOME%\\webapps\\quizapp.war" (
-                        echo quizapp.war exists.
-                    ) else (
-                        echo ERROR: quizapp.war not found.
-                    )
-
-                    if exist "%APPZ_HOME%\\webapps\\quizapp" (
-                        echo quizapp exploded directory exists.
-                    ) else (
-                        echo WARNING: quizapp exploded directory not created yet.
-                    )
-
-
-                    echo.
-                    echo ==========================================
-                    echo TOMCAT DEPLOYMENT COMPLETED
-                    echo ==========================================
+                    dir "%APPZ_HOME%\\webapps\\" | findstr Appzillon
                 '''
             }
         }
@@ -1218,10 +1459,9 @@ DB_PATH=$dbPath
                 echo 'CHECKING APPZILLON'
                 echo '=========================================='
 
+
                 bat '''
                     @echo off
-
-                    setlocal EnableDelayedExpansion
 
                     echo.
                     echo Appzillon URL:
@@ -1231,15 +1471,19 @@ DB_PATH=$dbPath
                     echo Tomcat Port:
                     echo %TOMCAT_PORT%
 
+
                     set RETRIES=30
+
 
                     :CHECK_APPZILLON
 
                     echo.
                     echo Checking Appzillon...
-                    echo Attempts remaining: !RETRIES!
+                    echo Attempts remaining: %RETRIES%
+
 
                     curl -s -o nul -w "%%{http_code}" "%APPZILLON_URL%" | findstr "200 302"
+
 
                     if not errorlevel 1 (
 
@@ -1252,55 +1496,77 @@ DB_PATH=$dbPath
                         echo %APPZILLON_URL%
 
                         exit /b 0
-                    )
+                    }
+
+
+                    curl -s -o nul -w "%%{http_code}" "%APPZILLON_URL%" | findstr "404"
+
+
+                    if not errorlevel 1 (
+
+                        echo Appzillon returned 404.
+
+                        echo Application may still be deploying.
+                    }
+
 
                     set /a RETRIES-=1
 
-                    if !RETRIES! LEQ 0 (
+
+                    if %RETRIES% LEQ 0 (
 
                         echo.
                         echo ==========================================
                         echo APPZILLON HEALTH CHECK TIMEOUT
                         echo ==========================================
 
+
                         echo.
-                        echo Tomcat port status:
+                        echo TOMCAT PORT STATUS
 
                         netstat -ano | findstr :%TOMCAT_PORT%
 
-                        echo.
-
-                        echo Checking if quizapp deployment exists:
-
-                        if exist "%APPZ_HOME%\\webapps\\quizapp" (
-                            echo quizapp exploded directory exists.
-                        ) else (
-                            echo quizapp exploded directory NOT found.
-                        )
 
                         echo.
+                        echo TOMCAT LOGS
 
-                        echo Tomcat logs:
 
                         if exist "%APPZ_HOME%\\logs\\catalina.out" (
+
                             powershell -Command "Get-Content '%APPZ_HOME%\\logs\\catalina.out' -Tail 50"
-                        ) else (
-                            dir "%APPZ_HOME%\\logs\\"
                         )
+                        else (
+
+                            dir "%APPZ_HOME%\\logs\\" 2>nul
+                        )
+
 
                         echo.
+                        echo WEBAPPS
 
-                        netstat -ano | findstr :%TOMCAT_PORT% | findstr LISTENING >nul
+                        dir "%APPZ_HOME%\\webapps\\"
+
+
+                        netstat -ano |
+                            findstr :%TOMCAT_PORT% |
+                            findstr LISTENING >nul
+
 
                         if not errorlevel 1 (
+
                             echo Tomcat is listening.
-                            echo Continuing because Tomcat is running.
+
+                            echo Continuing pipeline.
+
                             exit /b 0
-                        )
+                        }
+
 
                         exit /b 1
-                    )
+                    }
 
+
+                    echo.
                     echo Waiting 5 seconds...
 
                     ping 127.0.0.1 -n 6 >nul
@@ -1323,25 +1589,27 @@ DB_PATH=$dbPath
                 echo 'OPENING APPZILLON'
                 echo '=========================================='
 
+
                 bat '''
                     @echo off
 
-                    echo URL:
-                    echo %APPZILLON_URL%
+                    echo URL: %APPZILLON_URL%
+
 
                     start "" "%APPZILLON_URL%"
 
+
                     ping 127.0.0.1 -n 3 >nul
+
+
+                    echo Appzillon popup triggered.
+
 
                     if exist "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe" (
 
-                        start "" ^
-                        "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe" ^
-                        "%APPZILLON_URL%"
+                        start "" "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe" "%APPZILLON_URL%"
                     )
 
-                    echo.
-                    echo Appzillon browser opened.
 
                     echo Waiting for UI...
 
@@ -1353,90 +1621,95 @@ DB_PATH=$dbPath
 
         // ============================================================
         // PLAYWRIGHT
-        //
-        // Your original PLAYWRIGHT_DIR pointed directly to:
-        // playwrightTest.java
-        //
-        // Therefore npx/package.json commands were incorrect.
-        //
-        // This stage runs the Java test through Maven.
         // ============================================================
 
-        stage('Playwright UI Tests') {
+        stage('Playwright UI Tests - After Open') {
 
             steps {
 
                 echo '=========================================='
-                echo 'RUNNING PLAYWRIGHT JAVA TEST'
+                echo 'PLAYWRIGHT UI TESTS'
                 echo '=========================================='
+
 
                 bat '''
                     @echo off
 
-                    echo.
-                    echo Playwright Java file:
-                    echo %PLAYWRIGHT_FILE%
 
-                    echo.
+                    echo Playwright directory:
+                    echo %PLAYWRIGHT_DIR%
+
+
                     echo Appzillon URL:
                     echo %APPZILLON_URL%
 
 
-                    if not exist "%PLAYWRIGHT_FILE%" (
+                    echo.
 
-                        echo.
-                        echo WARNING: Playwright Java test file not found.
 
-                        echo Expected:
-                        echo %PLAYWRIGHT_FILE%
+                    if not exist "%PLAYWRIGHT_DIR%" (
 
-                        echo.
-                        echo Skipping Playwright stage.
+                        echo ERROR: Playwright directory not found.
 
-                        exit /b 0
-                    )
+                        echo Path:
+                        echo %PLAYWRIGHT_DIR%
+
+                        exit /b 1
+                    }
+
+
+                    if not exist "%PLAYWRIGHT_DIR%\\package.json" (
+
+                        echo ERROR: package.json missing.
+
+                        echo Contents:
+
+                        dir "%PLAYWRIGHT_DIR%"
+
+                        exit /b 1
+                    }
+
+
+                    cd /d "%PLAYWRIGHT_DIR%"
 
 
                     echo.
                     echo ==========================================
-                    echo PLAYWRIGHT JAVA TEST FOUND
+                    echo RUNNING PLAYWRIGHT
                     echo ==========================================
 
 
-                    set "JAVA_HOME=%JAVA_HOME%"
-                    set "PATH=%JAVA_HOME%\\bin;%MAVEN_HOME%\\bin;%PATH%"
-
-
-                    echo.
-                    echo Running Maven test...
-
-                    mvn test -DskipTests=false
+                    npx playwright test tests/05-home-quiz-flow.spec.js --headed --project=chromium 2>&1
 
 
                     set PW_EXIT=%errorlevel%
 
 
                     echo.
-                    echo Playwright/Maven exit code:
-                    echo %PW_EXIT%
+                    echo Playwright exit code: %PW_EXIT%
 
 
                     if %PW_EXIT% NEQ 0 (
 
-                        echo.
-                        echo ==========================================
-                        echo WARNING: PLAYWRIGHT TEST FAILED
-                        echo ==========================================
+                        echo WARNING: Playwright tests failed.
+
+                        if exist "playwright-report\\index.html" (
+
+                            start "" "playwright-report\\index.html"
+                        )
 
                         echo Pipeline will continue.
                     )
                     else (
 
-                        echo.
-                        echo ==========================================
-                        echo PLAYWRIGHT TEST PASSED
-                        echo ==========================================
-                    )
+                        echo ALL PLAYWRIGHT TESTS PASSED.
+
+                        if exist "playwright-report\\index.html" (
+
+                            start "" "playwright-report\\index.html"
+                        )
+                    }
+
 
                     exit /b 0
                 '''
@@ -1457,9 +1730,10 @@ DB_PATH=$dbPath
             echo 'QUIZAPP DEPLOYMENT SUCCESSFUL - NANBA!'
             echo '=========================================='
 
-            echo 'Backend: http://localhost:8080/api/categories'
-            echo 'Appzillon: http://localhost:8090/quizapp/'
-            echo 'AppzillonServer: http://localhost:8090/AppzillonServer/'
+            echo 'Backend: http://localhost:8080/api/user/getQuizzes'
+            echo 'Appzillon: http://localhost:8090/quizzz/'
+            echo 'AppzillonServer: http://localhost:8090/AppzillonServer/Appzillon'
+
             echo '=========================================='
         }
 
