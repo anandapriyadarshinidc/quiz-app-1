@@ -582,7 +582,7 @@ pipeline {
                     )
                     echo DB_PATH from vars: %DB_PATH%
 
-                    if "%DB_PATH%"=="" set "DB_PATH=%QUIZZ_BIN%\\Server\\Database\\MySql"
+                    if "%DB_PATH%"=="" set "DB_PATH=%QUIZZ_BIN%\Server\Database\MySql"
                     echo Using DB_PATH: %DB_PATH%
 
                     if not exist "%DB_PATH%" (
