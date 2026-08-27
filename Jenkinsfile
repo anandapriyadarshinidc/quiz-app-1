@@ -2,6 +2,12 @@ pipeline {
 
     agent any
 
+    options {
+        timeout(time: 30, unit: 'MINUTES')
+        disableConcurrentBuilds()
+        durabilityHint('PERFORMANCE_OPTIMIZED')
+    }
+
     environment {
 
         // ============================================================
@@ -17,172 +23,111 @@ pipeline {
         MAVEN_HOME = 'D:/apache-maven-3.8.5'
 
         // ============================================================
-        // BACKEND
+        // SPRING BOOT BACKEND
         // ============================================================
 
+        APP_JAR = 'target/quizapp.jar'
+
         BACKEND_PORT = '8080'
+
         BACKEND_URL = 'http://localhost:8080/api/categories'
 
         // ============================================================
-        // APPZILLON UI
+        // TOMCAT
         // ============================================================
 
-        FRONTEND_PORT = '8090'
-        FRONTEND_URL = 'http://localhost:8090/quizapp/'
+        APPZ_HOME = 'D:/apache-tomcat-9.0.53/apache-tomcat-9.0.53'
+
+        TOMCAT_PORT = '8090'
+
+        // WAR is deployed as quizzz.war
+        APPZILLON_URL = 'http://localhost:8090/quizapp/'
+
+        // ============================================================
+        // APPZILLON PROJECT
+        // ============================================================
+
+        APPZ_ARTIFACTS = 'D:/Deploy'
+
+        QUIZZ_PROJECT = 'C:/Users/ananda.dc/Downloads/quizapp (1)/quizapp'
+
+        QUIZZ_BIN = 'C:/Users/ananda.dc/Downloads/quizapp (1)/quizapp/bin'
+
+        // ============================================================
+        // DATABASE
+        // ============================================================
+
+        DB_NAME = 'quiz_app'
+
+        DB_USER = 'root'
+
+        DB_PASS = 'root'
+
+        MYSQL_BIN = 'C:/Program Files/MySQL/MySQL Server 8.0/bin'
+
+        // ============================================================
+        // PLAYWRIGHT
+        // ============================================================
+
+        PLAYWRIGHT_DIR = 'C:/Users/ananda.dc/Downloads/quiz-app-backend (1)/quiz-app/src/test/java/playwrightTest.java'
     }
 
 
     stages {
 
         // ============================================================
-        // 1. CHECKOUT
+        // 1. BUILD BACKEND
         // ============================================================
 
-        stage('Checkout') {
+        stage('Build Backend Jar') {
 
             steps {
 
                 echo '=========================================='
-                echo 'CHECKING OUT QUIZ APPLICATION'
+                echo 'BUILDING QUIZ APP BACKEND'
                 echo '=========================================='
-
-                git branch: 'main',
-                    url: 'https://github.com/anandapriyadarshinidc/quiz-app-1.git'
-            }
-        }
-
-
-        // ============================================================
-        // 2. CHECK WORKSPACE
-        // ============================================================
-
-        stage('Check Workspace') {
-
-            steps {
 
                 bat '''
                     @echo off
 
-                    echo ==========================================
-                    echo WORKSPACE CHECK
-                    echo ==========================================
-
-                    echo Workspace:
-                    echo %WORKSPACE%
+                    set "JAVA_HOME=%JAVA_HOME%"
+                    set "PATH=%JAVA_HOME%\\bin;%MAVEN_HOME%\\bin;%PATH%"
 
                     echo.
-                    echo Workspace contents:
-                    dir
+                    echo ==========================================
+                    echo JAVA VERSION
+                    echo ==========================================
+
+                    java -version
 
                     echo.
-                    echo Checking pom.xml...
+                    echo ==========================================
+                    echo MAVEN VERSION
+                    echo ==========================================
+
+                    mvn -version
+
+                    echo.
+                    echo ==========================================
+                    echo CHECKING PROJECT
+                    echo ==========================================
 
                     if not exist "pom.xml" (
                         echo ERROR: pom.xml not found.
+                        echo Current directory:
+                        cd
+                        dir
                         exit /b 1
                     )
 
                     echo pom.xml found successfully.
 
                     echo.
-                    echo Checking src directory...
-
-                    if not exist "src" (
-                        echo ERROR: src directory not found.
-                        exit /b 1
-                    )
-
-                    echo src directory found successfully.
-
-                    echo.
-                    echo Checking application.properties...
-
-                    if not exist "src\\main\\resources\\application.properties" (
-                        echo ERROR: application.properties not found.
-                        exit /b 1
-                    )
-
-                    echo application.properties found successfully.
-
-                    echo.
-                    echo Workspace check completed successfully.
-                '''
-            }
-        }
-
-
-        // ============================================================
-        // 3. CHECK JAVA AND MAVEN
-        // ============================================================
-
-        stage('Check Java and Maven') {
-
-            steps {
-
-                bat '''
-                    @echo off
-
                     echo ==========================================
-                    echo CHECKING JAVA
+                    echo MAVEN BUILD
                     echo ==========================================
 
-                    set "JAVA_HOME=C:\\Program Files\\Java\\jdk-17.0.2"
-                    set "PATH=%JAVA_HOME%\\bin;%PATH%"
-
-                    echo JAVA_HOME:
-                    echo %JAVA_HOME%
-
-                    echo.
-                    echo Java version:
-
-                    java -version
-
-                    if errorlevel 1 (
-                        echo ERROR: Java is not working.
-                        exit /b 1
-                    )
-
-                    echo.
-                    echo ==========================================
-                    echo CHECKING MAVEN
-                    echo ==========================================
-
-                    mvn -version
-
-                    if errorlevel 1 (
-                        echo ERROR: Maven is not working.
-                        exit /b 1
-                    )
-
-                    echo.
-                    echo Java and Maven are working successfully.
-                '''
-            }
-        }
-
-
-        // ============================================================
-        // 4. BUILD BACKEND
-        // ============================================================
-
-        stage('Build Backend') {
-
-            steps {
-
-                bat '''
-                    @echo off
-
-                    echo ==========================================
-                    echo BUILDING SPRING BOOT BACKEND
-                    echo ==========================================
-
-                    set "JAVA_HOME=C:\\Program Files\\Java\\jdk-17.0.2"
-                    set "PATH=%JAVA_HOME%\\bin;%PATH%"
-
-                    echo.
-                    echo Starting Maven build...
-
-                    call mvn -B clean package -DskipTests
+                    mvn clean package -DskipTests
 
                     if errorlevel 1 (
                         echo.
@@ -198,180 +143,128 @@ pipeline {
                     echo ==========================================
 
                     echo.
-                    echo Contents of target directory:
+                    echo ==========================================
+                    echo TARGET FILES
+                    echo ==========================================
 
                     dir target
-
-                    echo.
-                    echo Checking generated JAR...
-
-                    if not exist "target\\*.jar" (
-                        echo ERROR: No JAR file found in target directory.
-                        exit /b 1
-                    )
-
-                    echo.
-                    echo JAR file generated successfully.
                 '''
             }
         }
 
 
         // ============================================================
-        // 5. FIND GENERATED JAR
+        // 2. CHECK JAR
         // ============================================================
 
-        stage('Find Backend JAR') {
+        stage('Check Backend Jar') {
 
             steps {
+
+                echo '=========================================='
+                echo 'CHECKING BACKEND JAR'
+                echo '=========================================='
 
                 bat '''
                     @echo off
 
-                    echo ==========================================
-                    echo FINDING BACKEND JAR
-                    echo ==========================================
-
-                    for %%F in ("target\\*.jar") do (
-                        echo Found JAR:
-                        echo %%~fF
+                    if not exist "%APP_JAR%" (
+                        echo ERROR: JAR file not found.
+                        echo Expected:
+                        echo %APP_JAR%
+                        echo.
+                        echo Target directory:
+                        dir target
+                        exit /b 1
                     )
 
                     echo.
-                    echo JAR discovery completed.
+                    echo ==========================================
+                    echo JAR FOUND
+                    echo ==========================================
+
+                    echo %APP_JAR%
                 '''
             }
         }
 
 
         // ============================================================
-        // 6. STOP OLD BACKEND
+        // 3. STOP OLD BACKEND
         // ============================================================
 
         stage('Stop Old Backend') {
 
             steps {
 
+                echo '=========================================='
+                echo 'STOPPING OLD BACKEND'
+                echo '=========================================='
+
                 bat '''
                     @echo off
 
-                    echo ==========================================
-                    echo STOPPING OLD BACKEND
-                    echo ==========================================
+                    echo Checking port %BACKEND_PORT%...
 
-                    echo Checking port 8080...
-
-                    netstat -ano | findstr LISTENING | findstr ":8080"
-
-                    for /f "tokens=5" %%a in ('netstat -ano ^| findstr LISTENING ^| findstr ":8080"') do (
-
-                        echo.
-                        echo Found process %%a using port 8080.
-
-                        echo Stopping process %%a...
-
+                    for /f "tokens=5" %%a in ('netstat -ano ^| findstr :%BACKEND_PORT% ^| findstr LISTENING') do (
+                        echo Stopping PID %%a
                         taskkill /F /PID %%a >nul 2>&1
-
                     )
 
-                    echo.
-                    echo Waiting for old backend to stop...
+                    echo Waiting...
 
-                    ping -n 4 127.0.0.1 >nul
+                    ping 127.0.0.1 -n 4 >nul
 
-                    echo.
-                    echo Port 8080 cleanup completed.
+                    echo Backend port checked.
                 '''
             }
         }
 
 
         // ============================================================
-        // 7. START BACKEND
+        // 4. START BACKEND
         // ============================================================
 
-        stage('Start Backend') {
+        stage('Deploy Backend') {
 
             steps {
+
+                echo '=========================================='
+                echo 'STARTING QUIZ APP BACKEND'
+                echo '=========================================='
 
                 bat '''
                     @echo off
 
-                    echo ==========================================
-                    echo STARTING SPRING BOOT BACKEND
-                    echo ==========================================
-
-                    set "JAVA_HOME=C:\\Program Files\\Java\\jdk-17.0.2"
+                    set "JAVA_HOME=%JAVA_HOME%"
                     set "PATH=%JAVA_HOME%\\bin;%PATH%"
 
-                    if exist "%WORKSPACE%\\backend.log" (
-                        del /F /Q "%WORKSPACE%\\backend.log"
-                    )
+                    set "JENKINS_NODE_COOKIE=dontKillMe"
 
-                    if exist "%WORKSPACE%\\backend-err.log" (
-                        del /F /Q "%WORKSPACE%\\backend-err.log"
-                    )
+                    echo JAVA_HOME:
+                    echo %JAVA_HOME%
 
                     echo.
-                    echo Searching for JAR...
+                    echo Starting backend...
 
-                    for %%F in ("%WORKSPACE%\\target\\*.jar") do (
-                        set "JAR_FILE=%%~fF"
-                    )
+                    start "QuizApp-Backend" /B cmd /c "set JENKINS_NODE_COOKIE=dontKillMe && set JAVA_HOME=%JAVA_HOME% && java -jar %APP_JAR% > backend.log 2>&1"
 
-                    if not defined JAR_FILE (
-                        echo ERROR: Backend JAR not found.
-                        exit /b 1
-                    )
-
-                    echo.
-                    echo JAR:
-                    echo %JAR_FILE%
-
-                    echo.
-                    echo BACKEND PORT:
-                    echo 8080
-
-                    echo.
-                    echo Starting Spring Boot...
-
-                    powershell -NoProfile -Command "$env:JENKINS_NODE_COOKIE='dontKillMe'; Start-Process -FilePath '%JAVA_HOME%\\bin\\java.exe' -ArgumentList '-jar','%JAR_FILE%','--server.port=8080' -RedirectStandardOutput '%WORKSPACE%\\backend.log' -RedirectStandardError '%WORKSPACE%\\backend-err.log' -WindowStyle Hidden"
-
-                    echo.
                     echo Backend start command executed.
 
                     echo.
-                    echo Waiting for Spring Boot to start...
+                    echo Waiting for backend...
 
-                    ping -n 11 127.0.0.1 >nul
-
-                    echo.
-                    echo ==========================================
-                    echo PORT 8080 STATUS
-                    echo ==========================================
-
-                    netstat -ano | findstr LISTENING | findstr ":8080"
+                    ping 127.0.0.1 -n 10 >nul
 
                     echo.
                     echo ==========================================
                     echo BACKEND LOG
                     echo ==========================================
 
-                    if exist "%WORKSPACE%\\backend.log" (
-                        powershell -NoProfile -Command "Get-Content '%WORKSPACE%\\backend.log' -Tail 100"
+                    if exist backend.log (
+                        powershell -Command "Get-Content backend.log -Tail 40"
                     ) else (
                         echo backend.log not found.
-                    )
-
-                    echo.
-                    echo ==========================================
-                    echo BACKEND ERROR LOG
-                    echo ==========================================
-
-                    if exist "%WORKSPACE%\\backend-err.log" (
-                        powershell -NoProfile -Command "Get-Content '%WORKSPACE%\\backend-err.log' -Tail 100"
-                    ) else (
-                        echo backend-err.log not found.
                     )
                 '''
             }
@@ -379,239 +272,840 @@ pipeline {
 
 
         // ============================================================
-        // 8. BACKEND HEALTH CHECK
+        // 5. BACKEND HEALTH CHECK
         // ============================================================
 
         stage('Backend Health Check') {
 
             steps {
 
+                echo '=========================================='
+                echo 'BACKEND HEALTH CHECK'
+                echo '=========================================='
+
                 bat '''
                     @echo off
 
-                    echo ==========================================
-                    echo BACKEND HEALTH CHECK
-                    echo ==========================================
+                    set RETRIES=20
 
-                    echo Backend URL:
-                    echo http://localhost:8080
+                    :CHECK_BACKEND
 
                     echo.
-                    echo API:
-                    echo http://localhost:8080/api/categories
+                    echo Checking:
+                    echo %BACKEND_URL%
 
-                    echo.
-                    echo Checking backend...
+                    curl -s -o nul -w "%%{http_code}" "%BACKEND_URL%" | findstr "200 201"
 
-                    powershell -NoProfile -Command "$success=$false; for($i=1;$i -le 30;$i++){ Write-Host ('Attempt '+$i+' of 30'); try { $r=Invoke-WebRequest -Uri 'http://localhost:8080/api/categories' -UseBasicParsing -TimeoutSec 5; Write-Host ('HTTP Status: '+$r.StatusCode); if($r.StatusCode -ge 200 -and $r.StatusCode -lt 500){$success=$true; break} } catch { Write-Host 'Backend not ready yet.' }; Start-Sleep -Seconds 2 }; if(-not $success){ Write-Host 'BACKEND HEALTH CHECK FAILED'; exit 1 }"
-
-                    if errorlevel 1 (
-
+                    if not errorlevel 1 (
                         echo.
                         echo ==========================================
-                        echo BACKEND HEALTH CHECK FAILED
+                        echo BACKEND IS RUNNING
+                        echo ==========================================
+                        exit /b 0
+                    )
+
+                    echo Backend not ready.
+
+                    set /a RETRIES-=1
+
+                    if %RETRIES% LEQ 0 (
+                        echo.
+                        echo ==========================================
+                        echo BACKEND FAILED
                         echo ==========================================
 
                         echo.
                         echo PORT STATUS:
 
-                        netstat -ano | findstr ":8080"
+                        netstat -ano | findstr :%BACKEND_PORT%
 
                         echo.
-                        echo ==========================================
-                        echo BACKEND LOG
-                        echo ==========================================
+                        echo BACKEND LOG:
 
-                        if exist "%WORKSPACE%\\backend.log" (
-                            type "%WORKSPACE%\\backend.log"
+                        if exist backend.log (
+                            type backend.log
                         ) else (
                             echo backend.log not found.
                         )
 
+                        exit /b 1
+                    )
+
+                    echo Waiting 3 seconds...
+
+                    ping 127.0.0.1 -n 4 >nul
+
+                    goto CHECK_BACKEND
+                '''
+            }
+        }
+
+
+        // ============================================================
+        // 6. FIND APPZILLON FILES
+        // ============================================================
+
+        stage('Find Appzillon Files') {
+
+            steps {
+
+                echo '=========================================='
+                echo 'FINDING APPZILLON FILES'
+                echo '=========================================='
+
+                powershell '''
+                    $ErrorActionPreference = "Stop"
+
+                    Write-Host "=========================================="
+                    Write-Host "APPZILLON CONFIGURATION"
+                    Write-Host "=========================================="
+
+                    Write-Host "APPZ_HOME       : $env:APPZ_HOME"
+                    Write-Host "QUIZZ_PROJECT   : $env:QUIZZ_PROJECT"
+                    Write-Host "QUIZZ_BIN       : $env:QUIZZ_BIN"
+                    Write-Host "APPZ_ARTIFACTS  : $env:APPZ_ARTIFACTS"
+
+                    # ------------------------------------------------
+                    # CHECK TOMCAT
+                    # ------------------------------------------------
+
+                    if (-not (Test-Path $env:APPZ_HOME)) {
+
+                        Write-Host "ERROR: Tomcat directory not found."
+                        Write-Host $env:APPZ_HOME
+
+                        exit 1
+                    }
+
+                    if (-not (Test-Path "$env:APPZ_HOME/bin/catalina.bat")) {
+
+                        Write-Host "ERROR: catalina.bat not found."
+
+                        exit 1
+                    }
+
+                    Write-Host "Tomcat found successfully."
+
+                    $webWar = $null
+                    $serverWar = $null
+                    $webProps = $null
+                    $serverProps = $null
+                    $dbPath = $null
+
+                    # ------------------------------------------------
+                    # WEB WAR
+                    # ------------------------------------------------
+
+                    if (Test-Path "$env:QUIZZ_BIN/Web") {
+
+                        $file = Get-ChildItem `
+                            -Path "$env:QUIZZ_BIN/Web" `
+                            -Filter "*.war" `
+                            -Recurse `
+                            -ErrorAction SilentlyContinue |
+                            Select-Object -First 1
+
+                        if ($file) {
+                            $webWar = $file.FullName
+                        }
+                    }
+
+                    # ------------------------------------------------
+                    # SERVER WAR
+                    # ------------------------------------------------
+
+                    if (Test-Path "$env:QUIZZ_BIN/Server") {
+
+                        $file = Get-ChildItem `
+                            -Path "$env:QUIZZ_BIN/Server" `
+                            -Filter "*.war" `
+                            -Recurse `
+                            -ErrorAction SilentlyContinue |
+                            Select-Object -First 1
+
+                        if ($file) {
+                            $serverWar = $file.FullName
+                        }
+                    }
+
+                    # ------------------------------------------------
+                    # WEB PROPERTIES
+                    # ------------------------------------------------
+
+                    if (Test-Path "$env:QUIZZ_BIN/Web/Properties") {
+
+                        $directory = Get-ChildItem `
+                            -Path "$env:QUIZZ_BIN/Web/Properties" `
+                            -Directory `
+                            -ErrorAction SilentlyContinue |
+                            Select-Object -First 1
+
+                        if ($directory) {
+                            $webProps = $directory.FullName
+                        }
+                    }
+
+                    # ------------------------------------------------
+                    # SERVER PROPERTIES
+                    # ------------------------------------------------
+
+                    if (Test-Path "$env:QUIZZ_BIN/Server/Properties") {
+
+                        $directory = Get-ChildItem `
+                            -Path "$env:QUIZZ_BIN/Server/Properties" `
+                            -Directory `
+                            -ErrorAction SilentlyContinue |
+                            Select-Object -First 1
+
+                        if ($directory) {
+                            $serverProps = $directory.FullName
+                        }
+                    }
+
+                    # ------------------------------------------------
+                    # DATABASE
+                    # ------------------------------------------------
+
+                    $possibleDbPaths = @(
+                        "$env:QUIZZ_BIN/Server/Database/MySql",
+                        "$env:QUIZZ_BIN/Server/Properties/AppzillonServer/quizzz/Database/MySql",
+                        "$env:APPZ_ARTIFACTS/lib/AppzillonServer/quizzz/Database/MySql"
+                    )
+
+                    foreach ($path in $possibleDbPaths) {
+
+                        if (Test-Path $path) {
+
+                            $dbPath = $path
+
+                            break
+                        }
+                    }
+
+                    # ------------------------------------------------
+                    # FALLBACK WEB WAR
+                    # ------------------------------------------------
+
+                    if (-not $webWar) {
+
+                        if (Test-Path "$env:APPZ_ARTIFACTS/quizzz.war") {
+
+                            $webWar = "$env:APPZ_ARTIFACTS/quizzz.war"
+                        }
+                    }
+
+                    # ------------------------------------------------
+                    # FALLBACK SERVER WAR
+                    # ------------------------------------------------
+
+                    if (-not $serverWar) {
+
+                        if (Test-Path "$env:APPZ_ARTIFACTS/AppzillonServer.war") {
+
+                            $serverWar = "$env:APPZ_ARTIFACTS/AppzillonServer.war"
+                        }
+                    }
+
+                    # ------------------------------------------------
+                    # FALLBACK WEB PROPERTIES
+                    # ------------------------------------------------
+
+                    if (-not $webProps) {
+
+                        if (Test-Path "$env:APPZ_ARTIFACTS/quizzz") {
+
+                            $webProps = "$env:APPZ_ARTIFACTS/quizzz"
+                        }
+                    }
+
+                    # ------------------------------------------------
+                    # FALLBACK SERVER PROPERTIES
+                    # ------------------------------------------------
+
+                    if (-not $serverProps) {
+
+                        if (Test-Path "$env:APPZ_ARTIFACTS/lib/AppzillonServer") {
+
+                            $serverProps = "$env:APPZ_ARTIFACTS/lib/AppzillonServer"
+                        }
+                    }
+
+                    Write-Host ""
+                    Write-Host "=========================================="
+                    Write-Host "DISCOVERED FILES"
+                    Write-Host "=========================================="
+
+                    Write-Host "Web WAR      : $webWar"
+                    Write-Host "Server WAR   : $serverWar"
+                    Write-Host "Web Props    : $webProps"
+                    Write-Host "Server Props : $serverProps"
+                    Write-Host "DB Path      : $dbPath"
+
+                    # ------------------------------------------------
+                    # WEB WAR REQUIRED
+                    # ------------------------------------------------
+
+                    if (-not $webWar) {
+
+                        Write-Host ""
+                        Write-Host "ERROR: Web WAR was not found."
+
+                        exit 1
+                    }
+
+                    # ------------------------------------------------
+                    # SAVE VARIABLES
+                    # ------------------------------------------------
+
+                    $content = @(
+                        "WEB_WAR=$webWar"
+                        "SERVER_WAR=$serverWar"
+                        "WEB_PROPS=$webProps"
+                        "SERVER_PROPS=$serverProps"
+                        "DB_PATH=$dbPath"
+                    )
+
+                    Set-Content `
+                        -Path "$env:WORKSPACE/appzillon_vars.txt" `
+                        -Value $content
+
+                    Write-Host ""
+                    Write-Host "Appzillon variables saved."
+                '''
+            }
+        }
+
+
+        // ============================================================
+        // 7. COPY APPZILLON PROPERTIES
+        // ============================================================
+
+        stage('Copy Appzillon Properties') {
+
+            steps {
+
+                echo '=========================================='
+                echo 'COPYING APPZILLON PROPERTIES'
+                echo '=========================================='
+
+                powershell '''
+                    $ErrorActionPreference = "Stop"
+
+                    $vars = Get-Content `
+                        -Path "$env:WORKSPACE/appzillon_vars.txt"
+
+                    $map = @{}
+
+                    foreach ($line in $vars) {
+
+                        if ($line -match "^(.*?)=(.*)$") {
+
+                            $map[$matches[1]] = $matches[2]
+                        }
+                    }
+
+                    $webProps = $map["WEB_PROPS"]
+                    $serverProps = $map["SERVER_PROPS"]
+
+                    $libPath = "$env:APPZ_HOME/lib"
+
+                    # ------------------------------------------------
+                    # CREATE LIB DIRECTORY
+                    # ------------------------------------------------
+
+                    if (-not (Test-Path $libPath)) {
+
+                        New-Item `
+                            -ItemType Directory `
+                            -Path $libPath `
+                            -Force |
+                            Out-Null
+                    }
+
+                    Write-Host "Tomcat LIB:"
+                    Write-Host $libPath
+
+                    # ------------------------------------------------
+                    # WEB PROPERTIES
+                    # ------------------------------------------------
+
+                    if ($webProps -and (Test-Path $webProps)) {
+
+                        Write-Host ""
+                        Write-Host "Copying Web Properties..."
+                        Write-Host $webProps
+
+                        Copy-Item `
+                            -Path $webProps `
+                            -Destination $libPath `
+                            -Recurse `
+                            -Force
+
+                        Write-Host "Web properties copied."
+                    }
+                    else {
+
+                        Write-Host "WARNING: Web properties not found."
+                    }
+
+                    # ------------------------------------------------
+                    # SERVER PROPERTIES
+                    # ------------------------------------------------
+
+                    if ($serverProps -and (Test-Path $serverProps)) {
+
+                        Write-Host ""
+                        Write-Host "Copying Server Properties..."
+                        Write-Host $serverProps
+
+                        Copy-Item `
+                            -Path $serverProps `
+                            -Destination $libPath `
+                            -Recurse `
+                            -Force
+
+                        Write-Host "Server properties copied."
+                    }
+                    else {
+
+                        Write-Host "WARNING: Server properties not found."
+                    }
+                '''
+            }
+        }
+
+
+        // ============================================================
+        // 8. DATABASE
+        // ============================================================
+
+        stage('Database Setup') {
+
+            steps {
+
+                echo '=========================================='
+                echo 'DATABASE SETUP'
+                echo '=========================================='
+
+                bat '''
+                    @echo off
+
+                    echo Database:
+                    echo %DB_NAME%
+
+                    echo.
+                    echo MySQL path:
+                    echo %MYSQL_BIN%
+
+                    set "MYSQL_EXE=%MYSQL_BIN%\\mysql.exe"
+
+                    if not exist "%MYSQL_EXE%" (
+
+                        echo mysql.exe not found in configured location.
+
+                        where mysql >nul 2>&1
+
+                        if errorlevel 1 (
+
+                            echo WARNING: MySQL executable not found.
+                            echo Skipping database setup.
+
+                            goto DB_SKIP
+                        )
+
+                        for /f "delims=" %%i in ('where mysql') do (
+                            set "MYSQL_EXE=%%i"
+                        )
+                    )
+
+                    echo Using:
+                    echo %MYSQL_EXE%
+
+                    echo.
+                    echo Creating database...
+
+                    "%MYSQL_EXE%" -u%DB_USER% -p%DB_PASS% -e "CREATE DATABASE IF NOT EXISTS %DB_NAME%;"
+
+                    if errorlevel 1 (
+                        echo WARNING: Database creation failed.
+                    ) else (
+                        echo Database ready.
+                    )
+
+                    set "DB_PATH="
+
+                    if exist "%WORKSPACE%\\appzillon_vars.txt" (
+
+                        for /f "tokens=1,* delims==" %%a in (
+                            'type "%WORKSPACE%\\appzillon_vars.txt" ^| findstr DB_PATH'
+                        ) do (
+                            set "DB_PATH=%%b"
+                        )
+                    )
+
+                    echo.
+                    echo DB_PATH:
+                    echo %DB_PATH%
+
+                    if "%DB_PATH%"=="" (
+                        goto DB_SKIP
+                    )
+
+                    if not exist "%DB_PATH%" (
+                        echo DB path does not exist.
+                        goto DB_SKIP
+                    )
+
+                    echo.
+                    echo Searching SQL files...
+
+                    dir "%DB_PATH%\\*.sql"
+
+                    if errorlevel 1 (
+                        echo No SQL files found.
+                        goto DB_SKIP
+                    )
+
+                    for %%f in ("%DB_PATH%\\*.sql") do (
+
                         echo.
                         echo ==========================================
-                        echo BACKEND ERROR LOG
+                        echo EXECUTING %%~nxf
                         echo ==========================================
 
-                        if exist "%WORKSPACE%\\backend-err.log" (
-                            type "%WORKSPACE%\\backend-err.log"
+                        "%MYSQL_EXE%" -u%DB_USER% -p%DB_PASS% %DB_NAME% < "%%f"
+
+                        if errorlevel 1 (
+                            echo ERROR executing %%~nxf
                         ) else (
-                            echo backend-err.log not found.
+                            echo Successfully executed %%~nxf
+                        )
+                    )
+
+                    echo.
+                    echo ==========================================
+                    echo DATABASE TABLES
+                    echo ==========================================
+
+                    "%MYSQL_EXE%" -u%DB_USER% -p%DB_PASS% -D%DB_NAME% -e "SHOW TABLES;"
+
+                    :DB_SKIP
+
+                    echo.
+                    echo Database stage completed.
+                '''
+            }
+        }
+
+
+        // ============================================================
+        // 9. TOMCAT DEPLOYMENT
+        // ============================================================
+
+        stage('Deploy Appzillon to Tomcat') {
+
+            steps {
+
+                echo '=========================================='
+                echo 'DEPLOYING APPZILLON TO TOMCAT'
+                echo '=========================================='
+
+                bat '''
+                    @echo off
+
+                    set "WEB_WAR="
+                    set "SERVER_WAR="
+
+                    if exist "%WORKSPACE%\\appzillon_vars.txt" (
+
+                        for /f "tokens=1,* delims==" %%a in (
+                            'type "%WORKSPACE%\\appzillon_vars.txt" ^| findstr WEB_WAR'
+                        ) do (
+                            set "WEB_WAR=%%b"
+                        )
+
+                        for /f "tokens=1,* delims==" %%a in (
+                            'type "%WORKSPACE%\\appzillon_vars.txt" ^| findstr SERVER_WAR'
+                        ) do (
+                            set "SERVER_WAR=%%b"
+                        )
+                    )
+
+                    echo WEB WAR:
+                    echo %WEB_WAR%
+
+                    echo SERVER WAR:
+                    echo %SERVER_WAR%
+
+                    if "%WEB_WAR%"=="" (
+                        echo ERROR: Web WAR not found.
+                        exit /b 1
+                    )
+
+                    if not exist "%WEB_WAR%" (
+                        echo ERROR: Web WAR does not exist.
+                        exit /b 1
+                    )
+
+                    echo.
+                    echo ==========================================
+                    echo STOPPING TOMCAT
+                    echo ==========================================
+
+                    call "%APPZ_HOME%\\bin\\shutdown.bat"
+
+                    ping 127.0.0.1 -n 6 >nul
+
+                    echo.
+                    echo Killing remaining Tomcat process...
+
+                    for /f "tokens=5" %%a in (
+                        'netstat -ano ^| findstr :%TOMCAT_PORT% ^| findstr LISTENING'
+                    ) do (
+                        echo Killing PID %%a
+                        taskkill /F /PID %%a >nul 2>&1
+                    )
+
+                    ping 127.0.0.1 -n 3 >nul
+
+                    echo.
+                    echo ==========================================
+                    echo CLEANING OLD DEPLOYMENT
+                    echo ==========================================
+
+                    rmdir /S /Q "%APPZ_HOME%\\webapps\\quizzz" >nul 2>&1
+
+                    rmdir /S /Q "%APPZ_HOME%\\webapps\\AppzillonServer" >nul 2>&1
+
+                    del /F /Q "%APPZ_HOME%\\webapps\\quizzz.war" >nul 2>&1
+
+                    del /F /Q "%APPZ_HOME%\\webapps\\AppzillonServer.war" >nul 2>&1
+
+                    rmdir /S /Q "%APPZ_HOME%\\work\\Catalina\\localhost\\quizzz" >nul 2>&1
+
+                    rmdir /S /Q "%APPZ_HOME%\\work\\Catalina\\localhost\\AppzillonServer" >nul 2>&1
+
+                    echo.
+                    echo ==========================================
+                    echo COPYING WEB WAR
+                    echo ==========================================
+
+                    copy /Y "%WEB_WAR%" "%APPZ_HOME%\\webapps\\quizzz.war"
+
+                    if errorlevel 1 (
+                        echo ERROR: Web WAR copy failed.
+                        exit /b 1
+                    )
+
+                    echo Web WAR copied successfully.
+
+                    if not "%SERVER_WAR%"=="" (
+
+                        if exist "%SERVER_WAR%" (
+
+                            echo.
+                            echo Copying Server WAR...
+
+                            copy /Y "%SERVER_WAR%" "%APPZ_HOME%\\webapps\\AppzillonServer.war"
+
+                            if errorlevel 1 (
+                                echo ERROR: Server WAR copy failed.
+                                exit /b 1
+                            )
+
+                            echo Server WAR copied successfully.
+                        )
+                    )
+
+                    echo.
+                    echo ==========================================
+                    echo STARTING TOMCAT
+                    echo ==========================================
+
+                    set "JAVA_HOME=%JAVA_HOME%"
+                    set "CATALINA_HOME=%APPZ_HOME%"
+                    set "PATH=%JAVA_HOME%\\bin;%PATH%"
+                    set "JENKINS_NODE_COOKIE=dontKillMe"
+
+                    call "%APPZ_HOME%\\bin\\catalina.bat" start
+
+                    echo.
+                    echo Tomcat start command executed.
+
+                    echo.
+                    echo Waiting for Tomcat...
+
+                    ping 127.0.0.1 -n 21 >nul
+
+                    echo.
+                    echo ==========================================
+                    echo TOMCAT PORT STATUS
+                    echo ==========================================
+
+                    netstat -ano | findstr :%TOMCAT_PORT%
+
+                    echo.
+                    echo ==========================================
+                    echo WEBAPPS
+                    echo ==========================================
+
+                    dir "%APPZ_HOME%\\webapps"
+                '''
+            }
+        }
+
+
+        // ============================================================
+        // 10. APPZILLON HEALTH CHECK
+        // ============================================================
+
+        stage('Appzillon Health Check') {
+
+            steps {
+
+                echo '=========================================='
+                echo 'APPZILLON HEALTH CHECK'
+                echo '=========================================='
+
+                bat '''
+                    @echo off
+
+                    set RETRIES=30
+
+                    :CHECK_APPZILLON
+
+                    echo.
+                    echo Checking:
+                    echo %APPZILLON_URL%
+
+                    curl -s -o nul -w "%%{http_code}" "%APPZILLON_URL%" | findstr "200 302"
+
+                    if not errorlevel 1 (
+
+                        echo.
+                        echo ==========================================
+                        echo APPZILLON IS RUNNING
+                        echo ==========================================
+
+                        echo URL:
+                        echo %APPZILLON_URL%
+
+                        exit /b 0
+                    )
+
+                    echo Appzillon not ready.
+
+                    set /a RETRIES-=1
+
+                    if %RETRIES% LEQ 0 (
+
+                        echo.
+                        echo ==========================================
+                        echo APPZILLON HEALTH CHECK FAILED
+                        echo ==========================================
+
+                        echo.
+                        echo TOMCAT PORT:
+
+                        netstat -ano | findstr :%TOMCAT_PORT%
+
+                        echo.
+                        echo WEBAPPS:
+
+                        dir "%APPZ_HOME%\\webapps"
+
+                        echo.
+                        echo TOMCAT LOGS:
+
+                        if exist "%APPZ_HOME%\\logs\\catalina.out" (
+
+                            powershell -Command "Get-Content '%APPZ_HOME%\\logs\\catalina.out' -Tail 60"
+
+                        ) else (
+
+                            echo catalina.out not found.
                         )
 
                         exit /b 1
                     )
 
-                    echo.
-                    echo ==========================================
-                    echo BACKEND IS RUNNING
-                    echo ==========================================
+                    echo Waiting 5 seconds...
+
+                    ping 127.0.0.1 -n 6 >nul
+
+                    goto CHECK_APPZILLON
                 '''
             }
         }
 
 
         // ============================================================
-        // 9. CHECK APPZILLON UI
+        // 11. OPEN APPZILLON
         // ============================================================
 
-        stage('Check Appzillon UI') {
+        stage('Open Appzillon') {
 
             steps {
+
+                echo '=========================================='
+                echo 'OPENING APPZILLON'
+                echo '=========================================='
 
                 bat '''
                     @echo off
 
-                    echo ==========================================
-                    echo CHECKING APPZILLON UI
-                    echo ==========================================
-
-                    echo.
                     echo Appzillon URL:
-                    echo http://localhost:8090/quizapp/
+                    echo %APPZILLON_URL%
 
-                    echo.
-                    echo Checking port 8090...
+                    start "" "%APPZILLON_URL%"
 
-                    netstat -ano | findstr LISTENING | findstr ":8090"
+                    echo Browser launch requested.
 
-                    if errorlevel 1 (
-
-                        echo.
-                        echo ==========================================
-                        echo ERROR: APPZILLON IS NOT RUNNING
-                        echo ==========================================
-
-                        echo Port 8090 is not listening.
-
-                        echo.
-                        echo Please start Appzillon/Tomcat on port 8090.
-
-                        exit /b 1
-                    )
-
-                    echo.
-                    echo Port 8090 is listening.
-
-                    echo.
-                    echo Testing Appzillon URL...
-
-                    curl -I -s --max-time 10 "http://localhost:8090/quizapp/"
-
-                    if errorlevel 1 (
-
-                        echo.
-                        echo ERROR: Appzillon UI could not be reached.
-                        exit /b 1
-                    )
-
-                    echo.
-                    echo ==========================================
-                    echo APPZILLON UI IS AVAILABLE
-                    echo ==========================================
+                    ping 127.0.0.1 -n 5 >nul
                 '''
             }
         }
 
 
         // ============================================================
-        // 10. INSTALL PLAYWRIGHT
+        // 12. PLAYWRIGHT
         // ============================================================
 
-        stage('Install Playwright Browser') {
-
+        stage('Playwright UI Tests') {
             steps {
+                echo '=========================================='
+                echo 'PLAYWRIGHT UI TESTS'
+                echo '=========================================='
 
                 bat '''
-                    @echo off
-
-                    echo ==========================================
-                    echo INSTALLING PLAYWRIGHT CHROMIUM
-                    echo ==========================================
-
-                    set "JAVA_HOME=C:\\Program Files\\Java\\jdk-17.0.2"
-                    set "PATH=%JAVA_HOME%\\bin;%PATH%"
-
-                    call mvn -B -Dexec.classpathScope=test -Dexec.mainClass=com.microsoft.playwright.CLI -Dexec.args="install chromium" org.codehaus.mojo:exec-maven-plugin:3.5.0:java
-
-                    if errorlevel 1 (
-
-                        echo.
-                        echo ERROR: Playwright Chromium installation failed.
-                        exit /b 1
-                    )
+                    echo Current workspace:
+                    cd
 
                     echo.
-                    echo Playwright Chromium installed successfully.
-                '''
-            }
-        }
-
-
-        // ============================================================
-        // 11. RUN PLAYWRIGHT TESTS
-        // ============================================================
-
-        stage('Run Playwright Tests') {
-
-            steps {
-
-                bat '''
-                    @echo off
-
                     echo ==========================================
-                    echo RUNNING PLAYWRIGHT TESTS
+                    echo PLAYWRIGHT JAVA TEST
                     echo ==========================================
 
-                    set "JAVA_HOME=C:\\Program Files\\Java\\jdk-17.0.2"
-                    set "PATH=%JAVA_HOME%\\bin;%PATH%"
-
-                    echo.
-                    echo Appzillon UI:
-                    echo http://localhost:8090/quizapp/
-
-                    echo.
-                    echo Backend:
-                    echo http://localhost:8080
-
-                    echo.
                     echo Running Maven tests...
 
-                    call mvn -B test
+                    call mvn test
 
-                    if errorlevel 1 (
-
+                    if %ERRORLEVEL% NEQ 0 (
                         echo.
                         echo ==========================================
-                        echo PLAYWRIGHT TEST FAILED
+                        echo PLAYWRIGHT TESTS FAILED
                         echo ==========================================
-
-                        exit /b 1
+                        exit /b %ERRORLEVEL%
                     )
 
                     echo.
                     echo ==========================================
-                    echo PLAYWRIGHT TEST PASSED
+                    echo PLAYWRIGHT TESTS PASSED
                     echo ==========================================
                 '''
             }
         }
-
-
-        // ============================================================
-        // 12. ARCHIVE JAR
-        // ============================================================
-
-        stage('Archive JAR') {
-
-            steps {
-
-                archiveArtifacts artifacts: 'target/*.jar',
-                    fingerprint: true
-            }
-        }
-    }
-
+       }
 
     // ================================================================
     // POST ACTIONS
@@ -622,39 +1116,31 @@ pipeline {
         success {
 
             echo '=========================================='
-            echo 'QUIZAPP PIPELINE SUCCESSFUL'
+            echo 'QUIZ APP DEPLOYMENT SUCCESSFUL'
             echo '=========================================='
 
-            echo 'Backend:'
-            echo 'http://localhost:8080'
+            echo 'Backend: http://localhost:8080'
 
-            echo 'Quiz API:'
-            echo 'http://localhost:8080/api/categories'
+            echo 'Backend API: http://localhost:8080/api/categories'
 
-            echo 'Appzillon UI:'
-            echo 'http://localhost:8090/quizapp/'
+            echo 'Appzillon: http://localhost:9090/quizzz'
 
             echo '=========================================='
         }
+
 
         failure {
 
             echo '=========================================='
-            echo 'QUIZAPP PIPELINE FAILED'
+            echo 'QUIZ APP DEPLOYMENT FAILED'
             echo '=========================================='
 
             echo 'Check the failed Jenkins stage.'
-            echo 'Check backend.log.'
-            echo 'Check backend-err.log.'
-            echo 'Check Playwright test output.'
 
-            echo '=========================================='
-        }
+            echo 'Backend log: backend.log'
 
-        always {
+            echo 'Tomcat logs: D:/apache-tomcat-9.0.53-windows-x64/apache-tomcat-9.0.53/logs'
 
-            echo '=========================================='
-            echo 'JENKINS PIPELINE COMPLETED'
             echo '=========================================='
         }
     }
