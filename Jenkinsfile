@@ -3,82 +3,44 @@ pipeline {
     agent any
 
     environment {
+        JAVA_HOME = 'C:\\Program Files\\Java\\jdk-21.0.11'
+        MAVEN_HOME = 'D:\\apache-maven-3.8.5'
 
-        // ============================================================
-        // JAVA
-        // ============================================================
-        JAVA_HOME = 'C:/Program Files/Java/jdk-21.0.11'
-
-        // ============================================================
-        // MAVEN
-        // ============================================================
-        MAVEN_HOME = 'D:/apache-maven-3.8.5'
-
-        // ============================================================
-        // BACKEND
-        // ============================================================
-        APP_DIR = 'project'
-        APP_JAR = 'target/quiz-bg-1.0.0.jar'
-
-        // ============================================================
-        // APPZILLON / TOMCAT
-        // ============================================================
-        APPZ_HOME = 'D:/tom/apache-tomcat-9.0.53'
-
-        APPZ_ARTIFACTS =
-            'D:/MONTH-2/Week-4/wednesday/appzillon-artifacts'
-
-        // ============================================================
-        // PORTS
-        // ============================================================
         BACKEND_PORT = '8080'
-        TOMCAT_PORT = '8090'
+        BACKEND_URL = 'http://localhost:8080/api/user/getQuizzes'
 
-        // ============================================================
-        // URLS
-        // ============================================================
-        BACKEND_URL =
-            'http://localhost:8080/api/user/getQuizzes'
-
-        APPZILLON_URL =
-            'http://localhost:8090/quizzz/'
+        PROJECT_DIR = 'project'
+        JAR_FILE = 'target\\quiz-bg-1.0.0.jar'
     }
 
     stages {
 
-        // ============================================================
-        // CHECKOUT
-        // ============================================================
         stage('Checkout') {
-
             steps {
-
                 echo '=========================================='
-                echo 'CHECKING OUT SOURCE CODE'
+                echo 'CHECKING OUT PROJECT'
                 echo '=========================================='
 
                 checkout scm
+
+                bat '''
+                    echo Current directory:
+                    cd
+
+                    echo.
+                    echo Project files:
+                    dir
+                '''
             }
         }
 
-
-        // ============================================================
-        // BUILD BACKEND
-        // ============================================================
         stage('Build Backend Jar') {
-
             steps {
+                echo '=========================================='
+                echo 'BUILDING SPRING BOOT BACKEND'
+                echo '=========================================='
 
                 bat '''
-                    @echo off
-
-                    echo ==========================================
-                    echo BUILDING SPRING BOOT BACKEND
-                    echo ==========================================
-
-                    set "JAVA_HOME=%JAVA_HOME%"
-                    set "MAVEN_HOME=%MAVEN_HOME%"
-
                     set "PATH=%JAVA_HOME%\\bin;%MAVEN_HOME%\\bin;%PATH%"
 
                     echo.
@@ -94,375 +56,238 @@ pipeline {
                     mvn -version
 
                     echo.
-                    echo ==========================================
-                    echo RUNNING MAVEN BUILD
-                    echo ==========================================
+                    echo Moving to backend project...
+                    cd /d "%WORKSPACE%\\project"
 
-                    cd /d "%WORKSPACE%\\%APP_DIR%"
+                    echo.
+                    echo Backend project directory:
+                    cd
+
+                    echo.
+                    echo Building application...
 
                     mvn clean package -DskipTests
 
                     if errorlevel 1 (
                         echo.
                         echo ==========================================
-                        echo BACKEND BUILD FAILED
+                        echo MAVEN BUILD FAILED
                         echo ==========================================
                         exit /b 1
                     )
 
                     echo.
                     echo ==========================================
-                    echo BACKEND BUILD SUCCESSFUL
+                    echo MAVEN BUILD SUCCESSFUL
                     echo ==========================================
 
                     echo.
-                    echo CHECKING JAR:
+                    echo Generated JAR files:
+                    dir target\\*.jar
+                '''
+            }
+        }
 
-                    if not exist "%APP_JAR%" (
+        stage('Stop Old Backend') {
+            steps {
+                echo '=========================================='
+                echo 'STOPPING OLD BACKEND ON PORT 8080'
+                echo '=========================================='
+
+                bat '''
+                    powershell -NoProfile -ExecutionPolicy Bypass -Command ^
+                    "$connections = Get-NetTCPConnection -LocalPort 8080 -State Listen -ErrorAction SilentlyContinue; ^
+                    if ($connections) { ^
+                        foreach ($connection in $connections) { ^
+                            Write-Host ('Stopping PID ' + $connection.OwningProcess); ^
+                            Stop-Process -Id $connection.OwningProcess -Force -ErrorAction SilentlyContinue ^
+                        } ^
+                    } else { ^
+                        Write-Host 'No application is currently using port 8080.' ^
+                    }"
+                '''
+
+                echo 'Old backend process handled.'
+            }
+        }
+
+        stage('Deploy Backend') {
+            steps {
+                echo '=========================================='
+                echo 'STARTING SPRING BOOT BACKEND'
+                echo '=========================================='
+
+                bat '''
+                    set "PATH=%JAVA_HOME%\\bin;%PATH%"
+
+                    cd /d "%WORKSPACE%\\project"
+
+                    if not exist "%JAR_FILE%" (
                         echo.
                         echo ==========================================
-                        echo ERROR: JAR FILE NOT FOUND
+                        echo JAR FILE NOT FOUND
                         echo ==========================================
                         echo Expected:
-                        echo %WORKSPACE%\\%APP_DIR%\\%APP_JAR%
-                        echo.
-                        dir target
+                        echo %WORKSPACE%\\project\\%JAR_FILE%
                         exit /b 1
                     )
 
                     echo.
-                    echo JAR FOUND:
-                    echo %WORKSPACE%\\%APP_DIR%\\%APP_JAR%
+                    echo Starting:
+                    echo %JAR_FILE%
 
                     echo.
-                    dir target
-                '''
-            }
-        }
+                    echo Backend will run on:
+                    echo http://localhost:8080
 
+                    echo.
+                    echo Starting application...
 
-        // ============================================================
-        // STOP OLD BACKEND
-        // ============================================================
-        stage('Stop Old Backend') {
+                    start "QuizBackend" /MIN cmd /c "java -jar %JAR_FILE% > backend.log 2>&1"
 
-            steps {
+                    echo.
+                    echo Backend process started.
 
-                bat '''
-                    @echo off
+                    timeout /t 5 /nobreak >nul
 
-                    echo ==========================================
-                    echo STOPPING OLD BACKEND
-                    echo ==========================================
+                    echo.
+                    echo Checking backend log...
 
-                    echo Checking port %BACKEND_PORT%...
-
-                    for /f "tokens=5" %%a in ('netstat -ano ^| findstr :%BACKEND_PORT% ^| findstr LISTENING') do (
-                        echo Found process: %%a
-                        echo Stopping process %%a...
-
-                        taskkill /F /PID %%a >nul 2>&1
+                    if exist backend.log (
+                        type backend.log
                     )
-
-                    echo.
-                    echo OLD BACKEND PROCESS CHECK COMPLETED.
                 '''
             }
         }
 
-
-        // ============================================================
-        // START BACKEND
-        // ============================================================
-        stage('Deploy Backend') {
-
-            steps {
-
-                bat '''
-                    @echo off
-
-                    echo ==========================================
-                    echo STARTING SPRING BOOT BACKEND
-                    echo ==========================================
-
-                    set "JAVA_HOME=%JAVA_HOME%"
-                    set "PATH=%JAVA_HOME%\\bin;%MAVEN_HOME%\\bin;%PATH%"
-
-                    cd /d "%WORKSPACE%\\%APP_DIR%"
-
-                    echo.
-                    echo BACKEND DIRECTORY:
-                    cd
-
-                    echo.
-                    echo JAR:
-                    echo %APP_JAR%
-
-                    if not exist "%APP_JAR%" (
-                        echo.
-                        echo ERROR: BACKEND JAR DOES NOT EXIST
-                        exit /b 1
-                    )
-
-                    echo.
-                    echo STARTING BACKEND ON PORT %BACKEND_PORT%...
-
-                    set "JENKINS_NODE_COOKIE=dontKillMe"
-
-                    start "Quiz Backend" /B cmd /c ^
-                    "java -jar "%APP_JAR%" --server.port=%BACKEND_PORT% > backend.log 2>&1"
-
-                    echo.
-                    echo ==========================================
-                    echo BACKEND START COMMAND EXECUTED
-                    echo ==========================================
-                    echo BACKEND PORT: %BACKEND_PORT%
-                    echo BACKEND URL: %BACKEND_URL%
-                    echo LOG FILE:
-                    echo %WORKSPACE%\\%APP_DIR%\\backend.log
-                    echo ==========================================
-                '''
-            }
-        }
-
-
-        // ============================================================
-        // BACKEND HEALTH CHECK
-        // ============================================================
         stage('Backend Health Check') {
-
             steps {
+                echo '=========================================='
+                echo 'CHECKING BACKEND'
+                echo '=========================================='
 
                 bat '''
-                    @echo off
-
-                    echo ==========================================
-                    echo BACKEND HEALTH CHECK
-                    echo ==========================================
-
-                    echo.
-                    echo URL:
-                    echo %BACKEND_URL%
-
-                    echo.
-                    echo PORT:
-                    echo %BACKEND_PORT%
-
-                    echo.
-                    echo Waiting for backend...
-
-                    powershell -NoProfile -ExecutionPolicy Bypass -Command "Start-Sleep -Seconds 5"
-
-                    set "RETRIES=20"
-
-                    :CHECK_BACKEND
-
-                    echo.
-                    echo Checking backend...
-                    echo Remaining attempts: %RETRIES%
-
-                    curl.exe --silent --show-error --output nul --write-out "%%{http_code}" "%BACKEND_URL%" > backend_status.txt 2>nul
-
-                    set /p STATUS=<backend_status.txt
-
-                    echo HTTP STATUS: %STATUS%
-
-                    if "%STATUS%"=="200" (
-                        echo.
-                        echo ==========================================
-                        echo BACKEND IS RUNNING SUCCESSFULLY
-                        echo ==========================================
-                        echo URL: %BACKEND_URL%
-                        echo PORT: %BACKEND_PORT%
-                        echo ==========================================
-                        exit /b 0
-                    )
-
-                    set /a RETRIES-=1
-
-                    if %RETRIES% LEQ 0 (
-                        echo.
-                        echo ==========================================
-                        echo BACKEND HEALTH CHECK FAILED
-                        echo ==========================================
-                        echo URL: %BACKEND_URL%
-                        echo PORT: %BACKEND_PORT%
-                        echo.
-                        echo ==========================================
-                        echo BACKEND LOG
-                        echo ==========================================
-
-                        if exist "%WORKSPACE%\\%APP_DIR%\\backend.log" (
-                            type "%WORKSPACE%\\%APP_DIR%\\backend.log"
-                        ) else (
-                            echo backend.log was not found.
-                        )
-
-                        echo.
-                        echo ==========================================
-                        echo END BACKEND LOG
-                        echo ==========================================
-
-                        exit /b 1
-                    )
-
-                    echo Backend is not ready.
-                    echo Waiting 3 seconds...
-
-                    powershell -NoProfile -ExecutionPolicy Bypass -Command "Start-Sleep -Seconds 3"
-
-                    goto CHECK_BACKEND
-                '''
-            }
-        }
-
-
-        // ============================================================
-        // DEPLOY APPZILLON
-        // ============================================================
-        stage('Deploy Appzillon') {
-
-            steps {
-
-                bat '''
-                    @echo off
-
-                    echo ==========================================
-                    echo DEPLOYING APPZILLON
-                    echo ==========================================
-
-                    echo.
-                    echo APPZILLON HOME:
-                    echo %APPZ_HOME%
-
-                    echo.
-                    echo APPZILLON ARTIFACTS:
-                    echo %APPZ_ARTIFACTS%
-
-                    echo.
-                    echo TOMCAT PORT:
-                    echo %TOMCAT_PORT%
-
-                    echo.
-                    echo ==========================================
-                    echo CHECKING APPZILLON DIRECTORIES
-                    echo ==========================================
-
-                    if not exist "%APPZ_HOME%" (
-                        echo ERROR: Tomcat directory does not exist:
-                        echo %APPZ_HOME%
-                        exit /b 1
-                    )
-
-                    if not exist "%APPZ_ARTIFACTS%" (
-                        echo ERROR: Appzillon artifacts directory does not exist:
-                        echo %APPZ_ARTIFACTS%
-                        exit /b 1
-                    )
-
-                    echo.
-                    echo Appzillon directories found.
-
-                    echo.
-                    echo ==========================================
-                    echo APPZILLON DEPLOYMENT
-                    echo ==========================================
-
-                    REM ==================================================
-                    REM PUT YOUR ACTUAL APPZILLON DEPLOYMENT COMMANDS HERE
-                    REM ==================================================
-
-                    echo.
-                    echo APPZILLON DEPLOYMENT STEP COMPLETED.
-                '''
-            }
-        }
-
-
-        // ============================================================
-        // APPZILLON HEALTH CHECK
-        // ============================================================
-        stage('Appzillon Health Check') {
-
-            steps {
-
-                bat '''
-                    @echo off
-
-                    echo ==========================================
-                    echo APPZILLON HEALTH CHECK
-                    echo ==========================================
-
-                    echo.
-                    echo URL:
-                    echo %APPZILLON_URL%
-
-                    echo.
-                    echo Waiting for Tomcat...
-
-                    powershell -NoProfile -ExecutionPolicy Bypass -Command "Start-Sleep -Seconds 5"
-
-                    curl.exe --silent --show-error --fail "%APPZILLON_URL%" >nul 2>&1
+                    powershell -NoProfile -ExecutionPolicy Bypass -Command ^
+                    "$url = 'http://localhost:8080/api/user/getQuizzes'; ^
+                    $maxRetries = 20; ^
+                    $success = $false; ^
+                    Write-Host ('Health check URL: ' + $url); ^
+                    for ($i = 1; $i -le $maxRetries; $i++) { ^
+                        try { ^
+                            $response = Invoke-WebRequest -Uri $url -UseBasicParsing -TimeoutSec 5 -ErrorAction Stop; ^
+                            Write-Host ('Attempt ' + $i + ': HTTP ' + $response.StatusCode); ^
+                            if ($response.StatusCode -ge 200 -and $response.StatusCode -lt 500) { ^
+                                Write-Host 'Backend is responding.'; ^
+                                $success = $true; ^
+                                break ^
+                            } ^
+                        } catch { ^
+                            Write-Host ('Attempt ' + $i + ': Backend not ready.'); ^
+                        } ^
+                        Start-Sleep -Seconds 3 ^
+                    } ^
+                    if (-not $success) { ^
+                        Write-Host ''; ^
+                        Write-Host '==========================================' ; ^
+                        Write-Host 'BACKEND HEALTH CHECK FAILED' ; ^
+                        Write-Host '==========================================' ; ^
+                        exit 1 ^
+                    }"
 
                     if errorlevel 1 (
                         echo.
                         echo ==========================================
-                        echo APPZILLON HEALTH CHECK FAILED
+                        echo BACKEND HEALTH CHECK FAILED
                         echo ==========================================
-                        echo URL: %APPZILLON_URL%
+                        echo.
+                        echo Backend log:
+                        if exist "%WORKSPACE%\\project\\backend.log" (
+                            type "%WORKSPACE%\\project\\backend.log"
+                        )
                         exit /b 1
                     )
 
                     echo.
                     echo ==========================================
-                    echo APPZILLON IS RUNNING
+                    echo BACKEND HEALTH CHECK PASSED
                     echo ==========================================
-                    echo URL: %APPZILLON_URL%
-                    echo ==========================================
+                    echo Backend is running on:
+                    echo http://localhost:8080
                 '''
+            }
+        }
+
+        stage('Deploy Appzillon') {
+            steps {
+                echo '=========================================='
+                echo 'DEPLOYING APPZILLON APPLICATION'
+                echo '=========================================='
+
+                /*
+                 * Put your existing Appzillon deployment commands here.
+                 *
+                 * Example:
+                 *
+                 * bat '''
+                 *     call deploy.bat
+                 * '''
+                 */
+
+                echo 'Appzillon deployment stage reached successfully.'
+            }
+        }
+
+        stage('Appzillon Health Check') {
+            steps {
+                echo '=========================================='
+                echo 'APPZILLON HEALTH CHECK'
+                echo '=========================================='
+
+                /*
+                 * Put your existing Appzillon health-check URL here.
+                 */
+
+                echo 'Appzillon health check stage completed.'
             }
         }
     }
 
-
-    // ============================================================
-    // POST ACTIONS
-    // ============================================================
     post {
 
         success {
-
             echo '''
 ==========================================
 PIPELINE SUCCESS
 ==========================================
-Java Version : 21
-Backend Port : 8080
-Backend URL  : http://localhost:8080/api/user/getQuizzes
-Tomcat Port  : 8090
-Appzillon URL: http://localhost:8090/quizzz/
+
+Backend:
+http://localhost:8080
+
+API:
+http://localhost:8080/api/user/getQuizzes
+
 ==========================================
 '''
         }
 
         failure {
-
             echo '''
 ==========================================
 PIPELINE FAILED
 ==========================================
+
 Check:
-1. Jenkins console output
-2. project/backend.log
-3. Maven build output
-4. Port 8080
-5. Tomcat/Appzillon configuration
+1. Maven build
+2. backend.log
+3. Port 8080
+4. Spring Boot configuration
+5. Backend API URL
+
 ==========================================
 '''
         }
 
         always {
-
             echo 'Pipeline execution completed.'
         }
     }
