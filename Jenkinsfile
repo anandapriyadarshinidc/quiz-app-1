@@ -34,9 +34,9 @@ pipeline {
 
         APPZ_ARTIFACTS = 'D:/forDeploy'
 
-        QUIZZ_PROJECT = 'C:/Users/ananda.dc/Downloads/quizapp (1)/quizapp'
+        QUIZZ_PROJECT = 'C:/Users/ananda.dc/Downloads/quizapp(1)/quizapp'
 
-        QUIZZ_BIN = 'C:/Users/ananda.dc/Downloads/quizapp (1)/quizapp/bin'
+        QUIZZ_BIN = 'C:/Users/ananda.dc/Downloads/quizapp(1)/quizapp/bin'
 
         TOMCAT_PORT = '8090'
 
