@@ -15,8 +15,8 @@ pipeline {
         // ★ GENERIC CONFIG - CHANGE ONLY HERE, ALL STAGES USE THESE ★
         // ============================================================
         // JAVA / MAVEN
-        JAVA_HOME = 'C:\Program Files\Java\jdk-17.0.2'
-        MAVEN_HOME = 'D:\apache-maven-3.8.5'
+        JAVA_HOME = 'C:/Program Files/Java/jdk-17.0.2'
+        MAVEN_HOME = 'D:/apache-maven-3.8.5'
 
         // BACKEND
         APP_JAR = 'target/quizapp.jar'
