@@ -38,7 +38,7 @@ pipeline {
         MYSQL_BIN = 'C:\Program Files\MySQL\MySQL Server 8.0\bin'
 
         // PLAYWRIGHT - runs AFTER UI popup (UI must be on APPZILLON_URL)
-        PLAYWRIGHT_DIR = 'D:\\playwright-quizzz'
+        PLAYWRIGHT_DIR = 'C:\Users\ananda.dc\Downloads\quiz-app-backend (1)\quiz-app\src\test\java\playwrightTest.java'
         // NOTE: All stages below read from above vars via %VAR% (bat) or $env:VAR (powershell) - no hardcoding inside stages
     }
 
