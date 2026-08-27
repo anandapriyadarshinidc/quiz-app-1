@@ -144,7 +144,7 @@ pipeline {
                     echo ==========================================
                     echo QUIZBACKEND JAR FOUND
                     echo ==========================================
-                    dir target//*.jar
+                    dir target\*.jar
                 '''
             }
         }
